@@ -1,0 +1,428 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row =>
+                    row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                );
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FortiGate Policy Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-2xl">
+        <h1 class="text-2xl font-bold mb-6 text-center">FortiGate Firewall Policy Generator</h1>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Import FortiGate Config</label>
+            <input type="file" id="configFile" accept=".txt,.conf" class="mt-1 block w-full">
+            <button type="button" onclick="importConfig()" class="mt-2 bg-green-600 text-white py-1 px-4 rounded-md hover:bg-green-700">Import Config</button>
+        </div>
+        <form id="policyForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Policy Name</label>
+                <input type="text" name="policy_name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., Internet-Access" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Policy Comment</label>
+                <input type="text" name="policy_comment" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., Ticketnumber, Usage" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Source Interfaces</label>
+                <div id="srcInterfaces" class="space-y-2">
+                    <select name="src_interfaces[]" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        <option value="">Select Interface</option>
+                    </select>
+                </div>
+                <button type="button" onclick="addInterface('srcInterfaces')" class="mt-2 text-sm text-blue-600">+ Add Source Interface</button>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Destination Interfaces</label>
+                <div id="dstInterfaces" class="space-y-2">
+                    <select name="dst_interfaces[]" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        <option value="">Select Interface</option>
+                    </select>
+                </div>
+                <button type="button" onclick="addInterface('dstInterfaces')" class="mt-2 text-sm text-blue-600">+ Add Destination Interface</button>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Source Addresses</label>
+                <div id="srcAddresses" class="space-y-2">
+                    <select name="src_addresses[]" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        <option value="all">all</option>
+                    </select>
+                </div>
+                <button type="button" onclick="addAddress('srcAddresses')" class="mt-2 text-sm text-blue-600">+ Add Source Address</button>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Destination Addresses</label>
+                <div id="dstAddresses" class="space-y-2">
+                    <select name="dst_addresses[]" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        <option value="all">all</option>
+                    </select>
+                </div>
+                <button type="button" onclick="addAddress('dstAddresses')" class="mt-2 text-sm text-blue-600">+ Add Destination Address</button>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Services</label>
+                <div id="services" class="space-y-2">
+                    <div class="flex space-x-2">
+                        <select onchange="handleServiceChange(this)" class="w-1/3 rounded-md border-gray-300 shadow-sm">
+                            <option value="">Select Service/Group</option>
+                            <optgroup label="Service Groups">
+                                {% for name in group_templates.keys() %}
+                                <option value="group:{{ name }}">{{ name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Individual Services">
+                                {% for name in service_templates.keys() %}
+                                <option value="service:{{ name }}">{{ name }}</option>
+                                {% endfor %}
+                                <option value="custom">Custom</option>
+                            </optgroup>
+                        </select>
+                        <input type="text" placeholder="Protocol" class="w-1/3 rounded-md border-gray-300 shadow-sm protocol" disabled>
+                        <input type="text" placeholder="Port" class="w-1/3 rounded-md border-gray-300 shadow-sm port" disabled>
+                    </div>
+                </div>
+                <button type="button" onclick="addService()" class="mt-2 text-sm text-blue-600">+ Add Service/Group</button>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Action</label>
+                <select name="action" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="accept">Accept</option>
+                    <option value="deny">Deny</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">NAT</label>
+                <select name="nat" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="disable">Disable</option>
+                    <option value="enable">Enable</option>
+                </select>
+            </div>
+			<div class="flex flex-col sm:flex-row gap-4">
+			  <button type="submit" class="w-full sm:w-1/2 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700">Generate Policy</button>
+			  <button type="button" onclick="clearForm()" class="w-full sm:w-1/2 bg-red-600 text-white py-2 rounded-md hover:bg-red-700">Clear Form</button>
+			</div>
+        </form>
+		<div id="output" class="mt-6 hidden space-y-4">
+		  <div class="border border-gray-300 rounded-lg shadow bg-white p-4">
+			<h2 class="text-lg font-semibold mb-2 text-blue-700">Output 1: All-in-One Policy</h2>
+			<pre class="bg-gray-100 p-4 rounded-md overflow-auto text-sm whitespace-pre-wrap h-96" id="out1"></pre>
+		  </div>
+		  <div class="border border-gray-300 rounded-lg shadow bg-white p-4">
+			<h2 class="text-lg font-semibold mb-2 text-green-700">Output 2: One Policy Per Service</h2>
+			<pre class="bg-gray-100 p-4 rounded-md overflow-auto text-sm whitespace-pre-wrap h-96" id="out2"></pre>
+		  </div>
+		  <div class="border border-gray-300 rounded-lg shadow bg-white p-4">
+			<h2 class="text-lg font-semibold mb-2 text-purple-700">Output 3: Per Src/Dst Interface and Service</h2>
+			<pre class="bg-gray-100 p-4 rounded-md overflow-auto text-sm whitespace-pre-wrap h-96" id="out3"></pre>
+		  </div>
+		</div>
+    </div>
+
+    <script>
+        let availableInterfaces = [];
+        let availableAddresses = ['all'];
+        let serviceTemplates = {{ service_templates | tojson }};
+        let groupTemplates = {{ group_templates | tojson }};
+
+        // Function to send logs to backend
+        async function sendLog(message) {
+            console.log(message); // Log to browser console
+            try {
+                const response = await fetch('/log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const result = await response.json();
+                if (result.status !== 'logged') {
+                    console.error('Failed to log to backend:', result);
+                }
+            } catch (e) {
+                console.error('Failed to send log to backend:', e.message);
+                console.error('Attempted log message:', message);
+            }
+        }
+
+function clearForm() {
+  const form = document.getElementById('policyForm');
+  form.reset();
+
+  // Reset dynamic selects
+  ['srcInterfaces', 'dstInterfaces', 'srcAddresses', 'dstAddresses'].forEach(id => {
+    const container = document.getElementById(id);
+    const firstSelect = container.querySelector('select');
+    container.innerHTML = '';
+    if (firstSelect) container.appendChild(firstSelect.cloneNode(true));
+  });
+
+  // Clear dynamic services
+  document.getElementById('services').innerHTML = '';
+  addService();
+
+  // Hide output
+  document.getElementById('output').classList.add('hidden');
+}
+		
+
+ function addInterface(containerId) {
+            sendLog(`Adding interface to ${containerId}`);
+            const container = document.getElementById(containerId);
+            const select = document.createElement('select');
+            select.name = containerId === 'srcInterfaces' ? 'src_interfaces[]' : 'dst_interfaces[]';
+            select.className = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm';
+            select.required = true;
+            select.innerHTML = '<option value="">Select Interface</option>' + 
+                availableInterfaces.map(intf => `<option value="${intf}">${intf}</option>`).join('');
+            select.addEventListener('change', (e) => {
+                sendLog(`Selected interface in ${containerId}: ${e.target.value}`);
+            });
+            container.appendChild(select);
+        }
+
+        function addAddress(containerId) {
+            sendLog(`Adding address to ${containerId}`);
+            const container = document.getElementById(containerId);
+            const select = document.createElement('select');
+            select.name = containerId === 'srcAddresses' ? 'src_addresses[]' : 'dst_addresses[]';
+            select.className = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm';
+            select.required = true;
+            select.innerHTML = availableAddresses.map(addr => `<option value="${addr}">${addr}</option>`).join('');
+            select.value = 'all';
+            select.addEventListener('change', (e) => {
+                sendLog(`Selected address in ${containerId}: ${e.target.value}`);
+            });
+            container.appendChild(select);
+        }
+
+        function addService() {
+            sendLog('Adding new service/group field');
+            const container = document.getElementById('services');
+            const div = document.createElement('div');
+            div.className = 'flex space-x-2';
+            div.innerHTML = `
+                <select onchange="handleServiceChange(this)" class="w-1/3 rounded-md border-gray-300 shadow-sm">
+                    <option value="">Select Service/Group</option>
+                    <optgroup label="Service Groups">
+                        ${Object.keys(groupTemplates).map(name => `<option value="group:${name}">${name}</option>`).join('')}
+                    </optgroup>
+                    <optgroup label="Individual Services">
+                        ${Object.keys(serviceTemplates).map(name => `<option value="service:${name}">${name}</option>`).join('')}
+                        <option value="custom">Custom</option>
+                    </optgroup>
+                </select>
+                <input type="text" placeholder="Protocol" class="w-1/3 rounded-md border-gray-300 shadow-sm protocol" disabled>
+                <input type="text" placeholder="Port" class="w-1/3 rounded-md border-gray-300 shadow-sm port" disabled>
+            `;
+            container.appendChild(div);
+        }
+
+        function handleServiceChange(select) {
+            const parent = select.parentElement;
+            const protocolInput = parent.querySelector('.protocol');
+            const portInput = parent.querySelector('.port');
+            const selectedValue = select.value;
+
+            sendLog(`Service/Group changed to: ${selectedValue}`);
+
+            if (selectedValue === 'custom') {
+                protocolInput.disabled = false;
+                portInput.disabled = false;
+                protocolInput.value = '';
+                portInput.value = '';
+                sendLog('Enabled custom service inputs');
+            } else if (selectedValue.startsWith('service:')) {
+                const svcName = selectedValue.split(':')[1];
+                protocolInput.disabled = true;
+                portInput.disabled = true;
+                protocolInput.value = serviceTemplates[svcName]?.protocol || 'UNKNOWN';
+                portInput.value = serviceTemplates[svcName]?.port || '0';
+                sendLog(`Set service ${svcName}: protocol=${protocolInput.value}, port=${portInput.value}`);
+            } else if (selectedValue.startsWith('group:')) {
+                protocolInput.disabled = true;
+                portInput.disabled = true;
+                protocolInput.value = 'Multiple Services';
+                portInput.value = groupTemplates[selectedValue.split(':')[1]].join(', ');
+                sendLog(`Set group ${selectedValue.split(':')[1]}: ${portInput.value}`);
+            } else {
+                protocolInput.disabled = true;
+                portInput.disabled = true;
+                protocolInput.value = '';
+                portInput.value = '';
+                sendLog('Cleared service inputs');
+            }
+        }
+
+        async function importConfig() {
+            sendLog('Import config button clicked');
+            const fileInput = document.getElementById('configFile');
+            if (!fileInput.files.length) {
+                sendLog('No file selected for import');
+                alert('Please select a config file.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('config_file', fileInput.files[0]);
+            sendLog(`Uploading config file: ${fileInput.files[0].name}`);
+
+            try {
+                const response = await fetch('/parse_config', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const result = await response.json();
+                sendLog(`Received parse_config response: ${JSON.stringify(result)}`);
+
+                if (result.error) {
+                    sendLog(`Error parsing config: ${result.error}`);
+                    alert(result.error);
+                    return;
+                }
+
+                // Update available interfaces and addresses
+                availableInterfaces = result.interfaces;
+                availableAddresses = ['all', ...result.addresses];
+                groupTemplates = { ...groupTemplates, ...result.service_groups };
+
+                // Update service templates with parsed services
+                result.services.forEach(svc => {
+                    serviceTemplates[svc.name] = { protocol: svc.protocol, port: svc.port };
+                });
+                sendLog(`Updated serviceTemplates: ${JSON.stringify(serviceTemplates)}`);
+                sendLog(`Updated groupTemplates: ${JSON.stringify(groupTemplates)}`);
+
+                // Update interface dropdowns
+                ['srcInterfaces', 'dstInterfaces'].forEach(containerId => {
+                    const container = document.getElementById(containerId);
+                    container.innerHTML = '';
+                    const select = document.createElement('select');
+                    select.name = containerId === 'srcInterfaces' ? 'src_interfaces[]' : 'dst_interfaces[]';
+                    select.className = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm';
+                    select.required = true;
+                    select.innerHTML = '<option value="">Select Interface</option>' + 
+                        availableInterfaces.map(intf => `<option value="${intf}">${intf}</option>`).join('');
+                    select.addEventListener('change', (e) => {
+                        sendLog(`Selected interface in ${containerId}: ${e.target.value}`);
+                    });
+                    container.appendChild(select);
+                });
+
+                // Update address dropdowns
+                ['srcAddresses', 'dstAddresses'].forEach(containerId => {
+                    const container = document.getElementById(containerId);
+                    container.innerHTML = '';
+                    const select = document.createElement('select');
+                    select.name = containerId === 'srcAddresses' ? 'src_addresses[]' : 'dst_addresses[]';
+                    select.className = 'mt-1 block w-full rounded-md border-gray-300 shadow-sm';
+                    select.required = true;
+                    select.innerHTML = availableAddresses.map(addr => `<option value="${addr}">${addr}</option>`).join('');
+                    select.value = 'all';
+                    select.addEventListener('change', (e) => {
+                        sendLog(`Selected address in ${containerId}: ${e.target.value}`);
+                    });
+                    container.appendChild(select);
+                });
+
+                // Update service dropdowns
+                document.querySelectorAll('#services select').forEach(select => {
+                    select.innerHTML = `
+                        <option value="">Select Service/Group</option>
+                        <optgroup label="Service Groups">
+                            ${Object.keys(groupTemplates).map(name => `<option value="group:${name}">${name}</option>`).join('')}
+                        </optgroup>
+                        <optgroup label="Individual Services">
+                            ${Object.keys(serviceTemplates).map(name => `<option value="service:${name}">${name}</option>`).join('')}
+                            <option value="custom">Custom</option>
+                        </optgroup>
+                    `;
+                });
+
+                sendLog('Config imported successfully');
+                alert('Config imported successfully!');
+            } catch (e) {
+                sendLog(`Error during config import: ${e.message}`);
+                alert('Failed to import config.');
+            }
+        }
+
+document.getElementById('policyForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    sendLog('Policy form submitted');
+    const formData = new FormData(e.target);
+    const services = [];
+    document.querySelectorAll('#services > div').forEach(div => {
+        const select = div.querySelector('select');
+        const protocol = div.querySelector('.protocol').value;
+        const port = div.querySelector('.port').value;
+        if (select.value) {
+            if (select.value.startsWith('group:')) {
+                services.push({ name: select.value.split(':')[1], type: 'group' });
+            } else if (select.value === 'custom') {
+                services.push({ name: `${protocol}_${port}`, type: 'custom', protocol: protocol, port: port });
+            } else {
+                services.push({ name: select.value.split(':')[1], type: 'template', protocol: protocol, port: port });
+            }
+        }
+    });
+    formData.append('services', JSON.stringify(services));
+    sendLog(`Submitting form with services: ${JSON.stringify(services)}`);
+
+    try {
+        const response = await fetch('/generate_policy', { method: 'POST', body: formData });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
+        sendLog(`Received generate_policy response: ${JSON.stringify(result)}`);
+
+        const outputDiv = document.getElementById('output');
+        outputDiv.classList.remove('hidden');
+		document.getElementById("out1").textContent = result.output1;
+		document.getElementById("out2").textContent = result.output2;
+		document.getElementById("out3").textContent = result.output3;
+        sendLog('Displayed all generated CLI commands');
+    } catch (e) {
+        sendLog(`Error generating policy: ${e.message}`);
+        alert('Failed to generate policy.');
+    }
+});
+
+        // Log initial page load
+        sendLog('Page loaded');
+    </script>
+
+</body>
+</html>
