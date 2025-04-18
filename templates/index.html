@@ -7,17 +7,22 @@
     <style>
         body {
             background-color: #f3f4f6;
-            min-height: 100vh;
             margin: 0;
             font-family: Arial, sans-serif;
+            display: flex;
+            min-height: 100vh; /* Ensure body takes at least the full viewport height */
         }
         .container {
-            max-width: 1480px;
-            margin: 0 auto;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
             padding: 16px;
             display: flex;
             flex-direction: row;
             gap: 16px;
+            box-sizing: border-box; /* Include padding in width/height */
+        }
+        html, body {
+            width: 100%; /* Full width */
             min-height: 100vh;
         }
         .form-container {
@@ -25,7 +30,7 @@
             padding: 32px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            width: 33.333%;
+            width: 40%;
             height: 100%;
             overflow-y: auto;
         }
@@ -135,7 +140,7 @@
             background-color: #15803d;
         }
         .output-container {
-            width: 66.667%;
+            width: 60%;
             height: 100%;
             display: flex;
             flex-direction: column;
