@@ -117,22 +117,23 @@ def save_template():
         logger.error("No template name provided")
         return jsonify({"error": "Template name is required"}), 400
 
+    # Explicitly capture all form fields, including empty ones
     template_data = {
         'policy_name': data.get('policy_name', ''),
         'policy_comment': data.get('policy_comment', ''),
-        'src_interfaces': data.getlist('src_interfaces[]'),
-        'dst_interfaces': data.getlist('dst_interfaces[]'),
-        'src_addresses': data.getlist('src_addresses[]'),
-        'dst_addresses': data.getlist('dst_addresses[]'),
-        'services': json.loads(data.get('services', '[]')),
-        'action': data.get('action', 'accept'),
+        'src_interfaces': data.getlist('src_interfaces[]') or [],
+        'dst_interfaces': data.getlist('dst_interfaces[]') or [],
+        'src_addresses': data.getlist('src_addresses[]') or [],
+        'dst_addresses': data.getlist('dst_addresses[]') or [],
+        'services': json.loads(data.get('services', '[]')) or [],
+        'action': data.get('action', ''),
         'ssl_ssh_profile': data.get('ssl_ssh_profile', ''),
         'webfilter_profile': data.get('webfilter_profile', ''),
         'application_list': data.get('application_list', ''),
         'ips_sensor': data.get('ips_sensor', ''),
-        'logtraffic': data.get('logtraffic', 'all'),
-        'logtraffic_start': data.get('logtraffic_start', 'enable'),
-        'auto_asic_offload': data.get('auto_asic_offload', 'enable'),
+        'logtraffic': data.get('logtraffic', ''),
+        'logtraffic_start': data.get('logtraffic_start', ''),
+        'auto_asic_offload': data.get('auto_asic_offload', ''),
         'nat': data.get('nat', '')
     }
 
@@ -141,7 +142,7 @@ def save_template():
     templates.append({'name': template_name, 'data': template_data})
 
     save_templates(templates)
-    logger.debug(f"Template '{template_name}' saved")
+    logger.debug(f"Template '{template_name}' saved with data: {template_data}")
     return jsonify({"status": "success", "message": f"Template '{template_name}' saved"})
 
 @app.route('/load_templates', methods=['GET'])
@@ -191,12 +192,13 @@ def generate_policy():
     ssl_ssh_profile = data.get('ssl_ssh_profile', '')
     webfilter_profile = data.get('webfilter_profile', '')
     application_list = data.get('application_list', '')
-    ips_sensor = data.get('ips_sensor', '')
+    ips_sensor = data.get('ips_sensor', '')  # Corrected line
     logtraffic = data.get('logtraffic', 'all')
     logtraffic_start = data.get('logtraffic_start', 'enable')
     auto_asic_offload = data.get('auto_asic_offload', 'enable')
     nat = data.get('nat', 'enable')
 
+    # Rest of the function remains unchanged
     logger.debug(f"Policy Name: {policy_name}")
     logger.debug(f"Policy Comment: {policy_comment}")
     logger.debug(f"Source Interfaces: {src_interfaces}")
@@ -347,7 +349,7 @@ def generate_policy():
 def parse_config():
     logger.debug("Received request to parse config")
     if 'config_file' not in request.files:
-        logger.error("No file uploaded")
+        logger.error("No file loaded")
         return jsonify({"error": "No file uploaded"}), 400
 
     file = request.files['config_file']
@@ -485,7 +487,7 @@ def parse_config():
 
         services.append({"name": service_name, "protocol": protocol, "port": port})
         logger.debug("Found service: %s (protocol: %s, port: %s)", service_name, protocol, port)
-        
+
     # Fallback: Parse services from firewall policies
     policy_service_pattern = re.compile(r'set service\s+((?:"[^"]+"\s*)+)', re.DOTALL)
     for match in policy_service_pattern.finditer(content):
@@ -495,7 +497,7 @@ def parse_config():
                 # Assume unknown services are TCP with port 0 (generic)
                 services.append({"name": svc, "protocol": "TCP", "port": "0"})
                 logger.debug("Found service from policy (fallback): %s (protocol: TCP, port: 0)", svc)
-        
+
     # Parse service groups (unchanged)
     service_group_pattern = re.compile(r'config firewall service group\s+edit\s+"([^"]+)"\s+set member\s+([^\n]+)\s+next', re.DOTALL)
     for match in service_group_pattern.finditer(content):
