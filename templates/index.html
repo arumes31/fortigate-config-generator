@@ -10,19 +10,19 @@
             margin: 0;
             font-family: Arial, sans-serif;
             display: flex;
-            min-height: 100vh; /* Ensure body takes at least the full viewport height */
+            min-height: 100vh;
         }
         .container {
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
+            width: 100%;
+            height: 100%;
             padding: 16px;
             display: flex;
             flex-direction: row;
             gap: 16px;
-            box-sizing: border-box; /* Include padding in width/height */
+            box-sizing: border-box;
         }
         html, body {
-            width: 100%; /* Full width */
+            width: 100%;
             min-height: 100vh;
         }
         .form-container {
@@ -74,6 +74,12 @@
         }
         .form-container .w-1-3 {
             width: 33.333%;
+        }
+        .form-container .w-1-2 {
+            width: 50%;
+        }
+        .form-container .w-1-4 {
+            width: 25%;
         }
         .form-container button {
             margin-top: 8px;
@@ -138,6 +144,17 @@
         }
         .form-container button.import-btn:hover {
             background-color: #15803d;
+        }
+        .form-container button.delete-template-btn {
+            background-color: #dc2626;
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            width: 100%;
+        }
+        .form-container button.delete-template-btn:hover {
+            background-color: #b91c1c;
         }
         .output-container {
             width: 60%;
@@ -262,6 +279,21 @@
         <!-- Form Section (Left) -->
         <div class="form-container">
             <h1>FGT Policy Generator</h1>
+			<div class="mb-4">
+				<label>Template Management</label>
+				<div class="flex gap-4">
+					<input type="text" id="templateName" placeholder="Template Name" class="w-1-3">
+					<button type="button" onclick="saveTemplate()" class="submit-btn w-1-6">Save Template</button>
+					<div class="searchable-dropdown w-1-1">
+						<input type="text" class="search-input" placeholder="Load Template..." onfocus="loadTemplateOptions(this)" oninput="filterDropdown(this)">
+						<input type="hidden" id="loadTemplate" class="hidden-input">
+						<div class="dropdown-list" id="templateDropdown">
+							<li data-value="">Select Template</li>
+						</div>
+					</div>
+					<button type="button" onclick="deleteTemplate()" class="delete-template-btn w-1-6">Delete Template</button>
+				</div>
+			</div>
             <div class="mb-4">
                 <label>Import FortiGate Config</label>
                 <input type="file" id="configFile" accept=".txt,.conf">
@@ -372,8 +404,8 @@
                 <div>
                     <label>Action</label>
                     <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search Action..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="action" class="hidden-input">
+                        <input type="text" class="search-input" placeholder="Search Action..." value="Accept" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                        <input type="hidden" name="action" class="hidden-input" value="accept">
                         <div class="dropdown-list">
                             <li data-value="accept">Accept</li>
                             <li data-value="deny">Deny</li>
@@ -381,10 +413,84 @@
                     </div>
                 </div>
                 <div>
+                    <label>SSL/SSH Profile</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search SSL/SSH Profile..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                        <input type="hidden" name="ssl_ssh_profile" class="hidden-input">
+                        <div class="dropdown-list">
+                            <li data-value="">None</li>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label>Webfilter Profile</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search Webfilter Profile..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                        <input type="hidden" name="webfilter_profile" class="hidden-input">
+                        <div class="dropdown-list">
+                            <li data-value="">None</li>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label>Application List</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search Application List..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                        <input type="hidden" name="application_list" class="hidden-input">
+                        <div class="dropdown-list">
+                            <li data-value="">None</li>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label>IPS Sensor</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search IPS Sensor..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                        <input type="hidden" name="ips_sensor" class="hidden-input">
+                        <div class="dropdown-list">
+                            <li data-value="">None</li>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label>Log Traffic</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search Log Traffic..." value="All" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                        <input type="hidden" name="logtraffic" class="hidden-input" value="all">
+                        <div class="dropdown-list">
+                            <li data-value="all">All</li>
+                            <li data-value="utm">UTM</li>
+                            <li data-value="disable">Disable</li>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label>Log Traffic Start</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search Log Traffic Start..." value="Enable" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                        <input type="hidden" name="logtraffic_start" class="hidden-input" value="enable">
+                        <div class="dropdown-list">
+                            <li data-value="enable">Enable</li>
+                            <li data-value="disable">Disable</li>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label>Auto ASIC Offload</label>
+                    <div class="searchable-dropdown">
+                        <input type="text" class="search-input" placeholder="Search Auto ASIC Offload..." value="Enable" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                        <input type="hidden" name="auto_asic_offload" class="hidden-input" value="enable">
+                        <div class="dropdown-list">
+                            <li data-value="enable">Enable</li>
+                            <li data-value="disable">Disable</li>
+                        </div>
+                    </div>
+                </div>
+                <div>
                     <label>NAT</label>
                     <div class="searchable-dropdown">
                         <input type="text" class="search-input" placeholder="Search NAT..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="nat" class="hidden-input">
+                        <input type="hidden" name="nat" class="hidden-input" value="disable">
                         <div class="dropdown-list">
                             <li data-value="disable">Disable</li>
                             <li data-value="enable">Enable</li>
@@ -432,15 +538,10 @@
                     var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
                     var firstSheetName = workbook.SheetNames[0];
                     var worksheet = workbook.Sheets[firstSheetName];
-
-                    // Convert sheet to JSON to filter blank rows
-                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, bluranks: false, defval: '' });
-                    // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
                     var filteredData = jsonData.filter(row =>
                         row.some(cell => cell !== '' && cell !== null && cell !== undefined)
                     );
-
-                    // Convert filtered JSON back to CSV
                     var csv = XLSX.utils.aoa_to_sheet(filteredData);
                     csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
                     return csv;
@@ -457,8 +558,11 @@
         let availableAddresses = ['all'];
         let serviceTemplates = {{ service_templates | tojson }};
         let groupTemplates = {{ group_templates | tojson }};
+        let sslSshProfiles = [];
+        let webfilterProfiles = [];
+        let applicationLists = [];
+        let ipsSensors = [];
 
-        // Function to send logs to backend
         async function sendLog(message) {
             console.log(message);
             try {
@@ -482,7 +586,10 @@
 
 		function showDropdown(input) {
 			const dropdown = input.nextElementSibling.nextElementSibling;
-			input.value = '';
+			
+			// Clear the input value for all dropdowns
+			input.value = ''; // Clear the input for search
+
 			dropdown.classList.add('active');
 			filterDropdown(input);
 		}
@@ -512,7 +619,6 @@
                 }
             });
 
-            // Show/hide group labels based on visible items
             const groupLabels = dropdown.querySelectorAll('li.group-label');
             groupLabels.forEach(label => {
                 const nextItems = [];
@@ -537,7 +643,6 @@
             input.nextElementSibling.nextElementSibling.classList.remove('active');
             sendLog(`Selected option: ${value} (${text})`);
 
-            // If this is a service dropdown, trigger handleServiceChange
             if (input.classList.contains('service-search')) {
                 handleServiceChange(input);
             }
@@ -552,7 +657,6 @@
             const form = document.getElementById('policyForm');
             form.reset();
 
-            // Reset dynamic fields
             ['srcInterfaces', 'dstInterfaces', 'srcAddresses', 'dstAddresses'].forEach(id => {
                 const container = document.getElementById(id);
                 container.innerHTML = '';
@@ -611,21 +715,31 @@
                 }
             });
 
-            // Clear and reset services
             const servicesContainer = document.getElementById('services');
             servicesContainer.innerHTML = '';
             addService();
 
-            // Reset Action and NAT dropdowns
-            document.querySelectorAll('select[name="action"], select[name="nat"]').forEach(select => {
-                const parent = select.parentElement;
-                const searchInput = parent.querySelector('.search-input');
-                const hiddenInput = parent.querySelector('.hidden-input');
-                searchInput.value = '';
-                hiddenInput.value = '';
+            ['action', 'ssl_ssh_profile', 'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat'].forEach(field => {
+                const dropdown = document.querySelector(`input[name="${field}"]`)?.parentElement;
+                if (dropdown) {
+                    const searchInput = dropdown.querySelector('.search-input');
+                    const hiddenInput = dropdown.querySelector('.hidden-input');
+                    if (field === 'action') {
+                        searchInput.value = 'Accept';
+                        hiddenInput.value = 'accept';
+                    } else if (field === 'logtraffic') {
+                        searchInput.value = 'All';
+                        hiddenInput.value = 'all';
+                    } else if (field === 'logtraffic_start' || field === 'auto_asic_offload') {
+                        searchInput.value = 'Enable';
+                        hiddenInput.value = 'enable';
+                    } else {
+                        searchInput.value = '';
+                        hiddenInput.value = '';
+                    }
+                }
             });
 
-            // Hide output
             document.getElementById('output').classList.add('hidden');
         }
 
@@ -663,7 +777,6 @@
             });
             container.appendChild(div);
 
-            // Add event listeners for dropdown items
             div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
                 li.addEventListener('click', () => selectOption(searchInput, li));
             });
@@ -685,14 +798,13 @@
                 <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
             `;
             const searchInput = div.querySelector('.search-input');
-            searchInput.value = 'all'; // Default value
+            searchInput.value = 'all';
             searchInput.nextElementSibling.value = 'all';
             searchInput.addEventListener('change', (e) => {
                 sendLog(`Selected address in ${containerId}: ${e.target.nextElementSibling.value}`);
             });
             container.appendChild(div);
 
-            // Add event listeners for dropdown items
             div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
                 li.addEventListener('click', () => selectOption(searchInput, li));
             });
@@ -724,7 +836,6 @@
             `;
             container.appendChild(div);
 
-            // Add event listeners for dropdown items
             div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
                 li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
             });
@@ -796,19 +907,24 @@
                     return;
                 }
 
-                // Update available interfaces and addresses
                 availableInterfaces = result.interfaces;
                 availableAddresses = ['all', ...result.addresses];
                 groupTemplates = { ...groupTemplates, ...result.service_groups };
+                sslSshProfiles = result.ssl_ssh_profiles;
+                webfilterProfiles = result.webfilter_profiles;
+                applicationLists = result.application_lists;
+                ipsSensors = result.ips_sensors;
 
-                // Update service templates with parsed services
                 result.services.forEach(svc => {
                     serviceTemplates[svc.name] = { protocol: svc.protocol, port: svc.port };
                 });
                 sendLog(`Updated serviceTemplates: ${JSON.stringify(serviceTemplates)}`);
                 sendLog(`Updated groupTemplates: ${JSON.stringify(groupTemplates)}`);
+                sendLog(`Updated sslSshProfiles: ${sslSshProfiles}`);
+                sendLog(`Updated webfilterProfiles: ${webfilterProfiles}`);
+                sendLog(`Updated applicationLists: ${applicationLists}`);
+                sendLog(`Updated ipsSensors: ${ipsSensors}`);
 
-                // Update interface dropdowns
                 ['srcInterfaces', 'dstInterfaces'].forEach(containerId => {
                     const container = document.getElementById(containerId);
                     container.innerHTML = '';
@@ -831,13 +947,11 @@
                     });
                     container.appendChild(div);
 
-                    // Add event listeners for dropdown items
                     div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
                         li.addEventListener('click', () => selectOption(searchInput, li));
                     });
                 });
 
-                // Update address dropdowns
                 ['srcAddresses', 'dstAddresses'].forEach(containerId => {
                     const container = document.getElementById(containerId);
                     container.innerHTML = '';
@@ -861,13 +975,11 @@
                     });
                     container.appendChild(div);
 
-                    // Add event listeners for dropdown items
                     div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
                         li.addEventListener('click', () => selectOption(searchInput, li));
                     });
                 });
 
-                // Update service dropdowns
                 document.querySelectorAll('#services .searchable-dropdown').forEach(dropdown => {
                     const list = dropdown.querySelector('.dropdown-list');
                     list.innerHTML = `
@@ -884,12 +996,357 @@
                     });
                 });
 
+                ['ssl_ssh_profile', 'webfilter_profile', 'application_list', 'ips_sensor'].forEach(field => {
+                    const dropdown = document.querySelector(`input[name="${field}"]`).parentElement;
+                    const list = dropdown.querySelector('.dropdown-list');
+                    const items = field === 'ssl_ssh_profile' ? sslSshProfiles :
+                                  field === 'webfilter_profile' ? webfilterProfiles :
+                                  field === 'application_list' ? applicationLists : ipsSensors;
+                    list.innerHTML = `<li data-value="">None</li>${items.map(item => `<li data-value="${item}">${item}</li>`).join('')}`;
+                    const searchInput = dropdown.querySelector('.search-input');
+                    list.querySelectorAll('li:not(.group-label)').forEach(li => {
+                        li.addEventListener('click', () => selectOption(searchInput, li));
+                    });
+                });
+
                 sendLog('Config imported successfully');
                 alert('Config imported successfully!');
             } catch (e) {
                 sendLog(`Error during config import: ${e.message}`);
                 alert('Failed to import config.');
             }
+        }
+
+        async function loadTemplateOptions(input) {
+            sendLog('Loading template options');
+            try {
+                const response = await fetch('/load_templates');
+                const result = await response.json();
+                const dropdown = input.nextElementSibling.nextElementSibling;
+                dropdown.innerHTML = '<li data-value="">Select Template</li>';
+                result.templates.forEach(name => {
+                    const li = document.createElement('li');
+                    li.setAttribute('data-value', name);
+                    li.textContent = name;
+                    li.addEventListener('click', () => loadTemplate(name, input));
+                    dropdown.appendChild(li);
+                });
+                dropdown.classList.add('active');
+                sendLog(`Loaded templates: ${result.templates}`);
+            } catch (e) {
+                sendLog(`Error loading templates: ${e.message}`);
+                alert('Failed to load templates.');
+            }
+        }
+
+        async function saveTemplate() {
+            const templateName = document.getElementById('templateName').value;
+            if (!templateName) {
+                sendLog('No template name provided');
+                alert('Please provide a template name.');
+                return;
+            }
+
+            sendLog(`Saving template: ${templateName}`);
+            const form = document.getElementById('policyForm');
+            const formData = new FormData(form);
+            formData.append('template_name', templateName);
+
+            const services = [];
+            document.querySelectorAll('#services > div').forEach(div => {
+                const searchInput = div.querySelector('.service-search');
+                const hiddenInput = searchInput.nextElementSibling;
+                const protocol = div.querySelector('.protocol').value;
+                const port = div.querySelector('.port').value;
+                const value = hiddenInput.value;
+                if (value) {
+                    if (value.startsWith('group:')) {
+                        services.push({ name: value.split(':')[1], type: 'group' });
+                    } else if (value === 'custom') {
+                        services.push({ name: `${protocol}_${port}`, type: 'custom', protocol, port });
+                    } else {
+                        services.push({ name: value.split(':')[1], type: 'template', protocol, port });
+                    }
+                }
+            });
+            formData.append('services', JSON.stringify(services));
+
+            try {
+                const response = await fetch('/save_template', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    sendLog(`Template '${templateName}' saved successfully`);
+                    alert(result.message);
+                } else {
+                    sendLog(`Error saving template: ${result.error}`);
+                    alert(result.error);
+                }
+            } catch (e) {
+                sendLog(`Error saving template: ${e.message}`);
+                alert('Failed to save template.');
+            }
+        }
+
+        async function loadTemplate(templateName, input) {
+            sendLog(`Loading template: ${templateName}`);
+            try {
+                const response = await fetch(`/get_template/${encodeURIComponent(templateName)}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    const data = result.data;
+                    clearForm();
+
+                    document.querySelector('input[name="policy_name"]').value = data.policy_name;
+                    document.querySelector('input[name="policy_comment"]').value = data.policy_comment;
+
+                    ['srcInterfaces', 'dstInterfaces', 'srcAddresses', 'dstAddresses'].forEach(containerId => {
+                        const container = document.getElementById(containerId);
+                        container.innerHTML = '';
+                        const fieldName = containerId === 'srcInterfaces' ? 'src_interfaces[]' :
+                                         containerId === 'dstInterfaces' ? 'dst_interfaces[]' :
+                                         containerId === 'srcAddresses' ? 'src_addresses[]' : 'dst_addresses[]';
+                        const items = data[fieldName.replace('[]', '')];
+                        items.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'flex items-center';
+                            div.innerHTML = `
+                                <div class="searchable-dropdown">
+                                    <input type="text" class="search-input" placeholder="Search ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}..." value="${item}" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                                    <input type="hidden" name="${fieldName}" class="hidden-input" value="${item}" required>
+                                    <div class="dropdown-list">
+                                        <li data-value="">Select ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}</li>
+                                        ${(containerId.includes('Interfaces') ? availableInterfaces : availableAddresses).map(val => `<li data-value="${val}">${val}</li>`).join('')}
+                                    </div>
+                                </div>
+                                <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
+                            `;
+                            container.appendChild(div);
+                            div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
+                                li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
+                            });
+                        });
+                    });
+
+                    const servicesContainer = document.getElementById('services');
+                    servicesContainer.innerHTML = '';
+                    data.services.forEach(svc => {
+                        const div = document.createElement('div');
+                        div.className = 'flex items-center';
+                        const value = svc.type === 'group' ? `group:${svc.name}` : svc.type === 'template' ? `service:${svc.name}` : 'custom';
+                        const displayName = svc.type === 'custom' ? svc.name : svc.name;
+                        const protocol = svc.protocol || '';
+                        const port = svc.port || '';
+                        div.innerHTML = `
+                            <div class="flex w-full">
+                                <div class="searchable-dropdown w-2-3">
+                                    <input type="text" class="search-input service-search" value="${displayName}" placeholder="Search Service/Group..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                                    <input type="hidden" class="hidden-input" value="${value}">
+                                    <div class="dropdown-list">
+                                        <li data-value="">Select Service/Group</li>
+                                        <li class="group-label">Service Groups</li>
+                                        ${Object.keys(groupTemplates).map(name => `<li data-value="group:${name}">${name}</li>`).join('')}
+                                        <li class="group-label">Individual Services</li>
+                                        ${Object.keys(serviceTemplates).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
+                                        <li data-value="custom">Custom</li>
+                                    </div>
+                                </div>
+                                <input type="text" placeholder="Protocol" class="w-1-3 protocol" value="${protocol}" ${svc.type !== 'custom' ? 'disabled' : ''}>
+                                <input type="text" placeholder="Port" class="w-1-3 port" value="${port}" ${svc.type !== 'custom' ? 'disabled' : ''}>
+                            </div>
+                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
+                        `;
+                        servicesContainer.appendChild(div);
+                        div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
+                            li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
+                        });
+                    });
+
+                    ['action', 'ssl_ssh_profile', 'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat'].forEach(field => {
+                        const dropdown = document.querySelector(`input[name="${field}"]`)?.parentElement;
+                        if (dropdown) {
+                            const searchInput = dropdown.querySelector('.search-input');
+                            const hiddenInput = dropdown.querySelector('.hidden-input');
+                            const value = data[field] || (field === 'action' ? 'accept' : field === 'logtraffic' ? 'all' : field === 'logtraffic_start' || field === 'auto_asic_offload' ? 'enable' : '');
+                            searchInput.value = value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
+                            hiddenInput.value = value;
+                        }
+                    });
+
+                    input.value = templateName;
+                    input.nextElementSibling.value = templateName;
+                    input.nextElementSibling.nextElementSibling.classList.remove('active');
+                    sendLog(`Template '${templateName}' loaded successfully`);
+                    alert(`Template '${templateName}' loaded successfully!`);
+                } else {
+                    sendLog(`Error loading template: ${result.error}`);
+                    alert(result.error);
+                }
+            } catch (e) {
+                sendLog(`Error loading template: ${e.message}`);
+                alert('Failed to load template.');
+            }
+        }
+
+        async function deleteTemplate() {
+            const templateName = document.getElementById('templateName').value;
+            if (!templateName) {
+                sendLog('No template name provided for deletion');
+                alert('Please provide a template name to delete.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete the template '${templateName}'? This action cannot be undone.`)) {
+                sendLog(`Deletion of template '${templateName}' cancelled by user`);
+                return;
+            }
+
+            sendLog(`Deleting template: ${templateName}`);
+            try {
+                const response = await fetch(`/delete_template/${encodeURIComponent(templateName)}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    sendLog(`Template '${templateName}' deleted successfully`);
+                    alert(result.message);
+                    document.getElementById('templateName').value = '';
+                    const loadTemplateInput = document.querySelector('#loadTemplate').previousElementSibling;
+                    await loadTemplateOptions(loadTemplateInput);
+                } else {
+                    sendLog(`Error deleting template: ${result.error}`);
+                    alert(result.error);
+                }
+            } catch (e) {
+                sendLog(`Error deleting template: ${e.message}`);
+                alert('Failed to delete template.');
+            }
+        }
+
+        function updateURL() {
+            const form = document.getElementById('policyForm');
+            const formData = new FormData(form);
+            const services = [];
+            document.querySelectorAll('#services > div').forEach(div => {
+                const searchInput = div.querySelector('.service-search');
+                const hiddenInput = searchInput.nextElementSibling;
+                const protocol = div.querySelector('.protocol').value;
+                const port = div.querySelector('.port').value;
+                const value = hiddenInput.value;
+                if (value) {
+                    if (value.startsWith('group:')) {
+                        services.push({ name: value.split(':')[1], type: 'group' });
+                    } else if (value === 'custom') {
+                        services.push({ name: `${protocol}_${port}`, type: 'custom', protocol, port });
+                    } else {
+                        services.push({ name: value.split(':')[1], type: 'template', protocol, port });
+                    }
+                }
+            });
+
+            const params = new URLSearchParams();
+            formData.forEach((value, key) => {
+                if (key !== 'services') {
+                    params.append(key, value);
+                }
+            });
+            params.set('services', JSON.stringify(services));
+
+            const newURL = `${window.location.pathname}?${params.toString()}`;
+            window.history.pushState({}, '', newURL);
+            sendLog(`Updated URL with form data: ${newURL}`);
+        }
+
+        function loadFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            if (!params.toString()) return;
+
+            clearForm();
+            sendLog('Loading form data from URL parameters');
+
+            const policyName = params.get('policy_name') || '';
+            const policyComment = params.get('policy_comment') || '';
+            document.querySelector('input[name="policy_name"]').value = policyName;
+            document.querySelector('input[name="policy_comment"]').value = policyComment;
+
+            ['src_interfaces[]', 'dst_interfaces[]', 'src_addresses[]', 'dst_addresses[]'].forEach(field => {
+                const containerId = field === 'src_interfaces[]' ? 'srcInterfaces' :
+                                   field === 'dst_interfaces[]' ? 'dstInterfaces' :
+                                   field === 'src_addresses[]' ? 'srcAddresses' : 'dstAddresses';
+                const container = document.getElementById(containerId);
+                container.innerHTML = '';
+                const values = params.getAll(field);
+                values.forEach(value => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center';
+                    div.innerHTML = `
+                        <div class="searchable-dropdown">
+                            <input type="text" class="search-input" placeholder="Search ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}..." value="${value}" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                            <input type="hidden" name="${field}" class="hidden-input" value="${value}" required>
+                            <div class="dropdown-list">
+                                <li data-value="">Select ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}</li>
+                                ${(containerId.includes('Interfaces') ? availableInterfaces : availableAddresses).map(val => `<li data-value="${val}">${val}</li>`).join('')}
+                            </div>
+                        </div>
+                        <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
+                    `;
+                    container.appendChild(div);
+                    div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
+                        li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
+                    });
+                });
+            });
+
+            const services = JSON.parse(params.get('services') || '[]');
+            const servicesContainer = document.getElementById('services');
+            servicesContainer.innerHTML = '';
+            services.forEach(svc => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center';
+                const value = svc.type === 'group' ? `group:${svc.name}` : svc.type === 'template' ? `service:${svc.name}` : 'custom';
+                const displayName = svc.type === 'custom' ? svc.name : svc.name;
+                const protocol = svc.protocol || '';
+                const port = svc.port || '';
+                div.innerHTML = `
+                    <div class="flex w-full">
+                        <div class="searchable-dropdown w-2-3">
+                            <input type="text" class="search-input service-search" value="${displayName}" placeholder="Search Service/Group..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                            <input type="hidden" class="hidden-input" value="${value}">
+                            <div class="dropdown-list">
+                                <li data-value="">Select Service/Group</li>
+                                <li class="group-label">Service Groups</li>
+                                ${Object.keys(groupTemplates).map(name => `<li data-value="group:${name}">${name}</li>`).join('')}
+                                <li class="group-label">Individual Services</li>
+                                ${Object.keys(serviceTemplates).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
+                                <li data-value="custom">Custom</li>
+                            </div>
+                        </div>
+                        <input type="text" placeholder="Protocol" class="w-1-3 protocol" value="${protocol}" ${svc.type !== 'custom' ? 'disabled' : ''}>
+                        <input type="text" placeholder="Port" class="w-1-3 port" value="${port}" ${svc.type !== 'custom' ? 'disabled' : ''}>
+                    </div>
+                    <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
+                `;
+                servicesContainer.appendChild(div);
+                div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
+                    li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
+                });
+            });
+
+            ['action', 'ssl_ssh_profile', 'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat'].forEach(field => {
+                const value = params.get(field) || (field === 'action' ? 'accept' : field === 'logtraffic' ? 'all' : field === 'logtraffic_start' || field === 'auto_asic_offload' ? 'enable' : '');
+                if (value) {
+                    const dropdown = document.querySelector(`input[name="${field}"]`)?.parentElement;
+                    if (dropdown) {
+                        const searchInput = dropdown.querySelector('.search-input');
+                        searchInput.value = value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
+                        dropdown.querySelector('.hidden-input').value = value;
+                    }
+                }
+            });
+
+            sendLog('Form data loaded from URL');
         }
 
         document.getElementById('policyForm').addEventListener('submit', async (e) => {
@@ -928,13 +1385,14 @@
                 document.getElementById("out2").textContent = result.output2;
                 document.getElementById("out3").textContent = result.output3;
                 sendLog('Displayed all generated CLI commands');
+
+                updateURL();
             } catch (e) {
                 sendLog(`Error generating policy: ${e.message}`);
                 alert('Failed to generate policy.');
             }
         });
 
-        // Initialize event listeners for existing dropdowns
         document.querySelectorAll('.searchable-dropdown').forEach(dropdown => {
             const searchInput = dropdown.querySelector('.search-input');
             dropdown.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
@@ -942,9 +1400,10 @@
             });
         });
 
-        // Log initial page load
-        sendLog('Page loaded');
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFromURL();
+            sendLog('Page loaded');
+        });
     </script>
-    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'931f7833a85c4571',t:'MTc0NDkzMDEwMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
