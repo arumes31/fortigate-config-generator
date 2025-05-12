@@ -8,32 +8,27 @@ import uuid
 import string
 import random
 from urllib.parse import urlparse
+import sqlite3
 
-# Clear all existing handlers to ensure clean logging setup
+# Configure logging
 for handler in logging.root.handlers[:]:
     logging.root.handlers.remove(handler)
 
-# Configure root logger
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 
-# Configure loggers for Flask and Werkzeug
 logger = logging.getLogger(__name__)
 flask_logger = logging.getLogger('flask')
 werkzeug_logger = logging.getLogger('werkzeug')
 
-# Clear existing handlers for Flask and Werkzeug loggers
 for handler in flask_logger.handlers[:]:
     flask_logger.handlers.remove(handler)
 for handler in werkzeug_logger.handlers[:]:
     werkzeug_logger.handlers.remove(handler)
 
-# Set levels and add StreamHandler to ensure consistent logging
 flask_logger.setLevel(logging.DEBUG)
 werkzeug_logger.setLevel(logging.DEBUG)
 stream_handler = logging.StreamHandler()
@@ -42,6 +37,32 @@ flask_logger.addHandler(stream_handler)
 werkzeug_logger.addHandler(stream_handler)
 
 app = Flask(__name__)
+
+# SQLite database setup
+DB_PATH = '/app/data/database.db'
+
+def init_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS templates (
+            name TEXT PRIMARY KEY,
+            data TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS short_urls (
+            short_code TEXT PRIMARY KEY,
+            url TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+    logger.debug("SQLite database initialized at %s", DB_PATH)
+
+# Initialize database
+init_db()
 
 # Get TRUSTED_DOMAIN from environment variable
 TRUSTED_DOMAIN = os.getenv('TRUSTED_DOMAIN')
@@ -79,49 +100,49 @@ SERVICE_GROUP_TEMPLATES = {
     "DNS-Group": ["DNS"]
 }
 
-# Template storage file (in persistent volume)
-TEMPLATE_FILE = '/app/data/templates.json'
-
-# Short URL storage file
-SHORT_URL_FILE = '/app/data/short_urls.json'
-
-# Ensure the templates.json file exists
-def ensure_template_file():
-    if not os.path.exists(TEMPLATE_FILE):
-        os.makedirs(os.path.dirname(TEMPLATE_FILE), exist_ok=True)
-        with open(TEMPLATE_FILE, 'w') as f:
-            json.dump([], f)
-        logger.debug(f"Created empty templates file at {TEMPLATE_FILE}")
-
-# Ensure the short_urls.json file exists
-def ensure_short_url_file():
-    if not os.path.exists(SHORT_URL_FILE):
-        os.makedirs(os.path.dirname(SHORT_URL_FILE), exist_ok=True)
-        with open(SHORT_URL_FILE, 'w') as f:
-            json.dump({}, f)
-        logger.debug(f"Created empty short_urls file at {SHORT_URL_FILE}")
-
-# Load existing templates or initialize empty list
+# Load templates from SQLite
 def load_templates():
-    ensure_template_file()
-    with open(TEMPLATE_FILE, 'r') as f:
-        return json.load(f)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT name, data FROM templates')
+    templates = [{'name': name, 'data': json.loads(data)} for name, data in cursor.fetchall()]
+    conn.close()
+    logger.debug("Loaded %d templates from SQLite", len(templates))
+    return templates
 
-# Save templates
+# Save templates to SQLite
 def save_templates(templates):
-    with open(TEMPLATE_FILE, 'w') as f:
-        json.dump(templates, f, indent=4)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM templates')  # Clear existing templates
+    for template in templates:
+        cursor.execute('INSERT INTO templates (name, data) VALUES (?, ?)',
+                       (template['name'], json.dumps(template['data'])))
+    conn.commit()
+    conn.close()
+    logger.debug("Saved %d templates to SQLite", len(templates))
 
-# Load short URL mappings
+# Load short URL mappings from SQLite
 def load_short_urls():
-    ensure_short_url_file()
-    with open(SHORT_URL_FILE, 'r') as f:
-        return json.load(f)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT short_code, url FROM short_urls')
+    short_urls = {short_code: url for short_code, url in cursor.fetchall()}
+    conn.close()
+    logger.debug("Loaded %d short URLs from SQLite", len(short_urls))
+    return short_urls
 
-# Save short URL mappings
+# Save short URL mappings to SQLite
 def save_short_urls(short_urls):
-    with open(SHORT_URL_FILE, 'w') as f:
-        json.dump(short_urls, f, indent=4)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM short_urls')  # Clear existing short URLs
+    for short_code, url in short_urls.items():
+        cursor.execute('INSERT INTO short_urls (short_code, url) VALUES (?, ?)',
+                       (short_code, url))
+    conn.commit()
+    conn.close()
+    logger.debug("Saved %d short URLs to SQLite", len(short_urls))
 
 # Generate a random short code
 def generate_short_code(length=6):
@@ -134,7 +155,6 @@ def is_trusted_domain(url):
         parsed_url = urlparse(url)
         domain = parsed_url.netloc.lower()
         if not domain:
-            # If no netloc (e.g., relative URL), assume it's local and check path
             return parsed_url.path.startswith('/') and not parsed_url.path.startswith('//')
         return domain == TRUSTED_DOMAIN.lower() or domain.endswith('.' + TRUSTED_DOMAIN.lower())
     except Exception as e:
@@ -152,21 +172,18 @@ def shorten_url():
 
     original_url = data['url']
     
-    # Validate the URL domain
     if not is_trusted_domain(original_url):
         logger.warning(f"URL {original_url} does not match TRUSTED_DOMAIN {TRUSTED_DOMAIN}")
         return jsonify({"error": f"URL must belong to trusted domain: {TRUSTED_DOMAIN}"}), 403
 
     short_urls = load_short_urls()
 
-    # Check if URL already has a short code
     for short_code, url in short_urls.items():
         if url == original_url:
             short_url = f"{request.host_url}s/{short_code}"
             logger.debug(f"Found existing short URL: {short_url} for {original_url}")
             return jsonify({"status": "success", "short_code": short_code})
 
-    # Generate a unique short code
     while True:
         short_code = generate_short_code()
         if short_code not in short_urls:
@@ -187,7 +204,6 @@ def redirect_short_url(short_code):
         logger.error(f"Short code {short_code} not found")
         return jsonify({"error": "Short URL not found"}), 404
     
-    # Validate the stored URL domain
     if not is_trusted_domain(original_url):
         logger.warning(f"Stored URL {original_url} for short code {short_code} does not match TRUSTED_DOMAIN {TRUSTED_DOMAIN}")
         return jsonify({"error": f"Redirect URL does not belong to trusted domain: {TRUSTED_DOMAIN}"}), 403
@@ -221,16 +237,12 @@ def save_template():
         logger.error("No template name provided")
         return jsonify({"error": "Template name is required"}), 400
 
-    # Parse policies from form data
     policies = json.loads(data.get('policies', '[]')) or []
     if not policies:
         logger.error("No policies provided")
         return jsonify({"error": "At least one policy is required"}), 400
 
-    # Structure template data with multiple policies
-    template_data = {
-        'policies': []
-    }
+    template_data = {'policies': []}
     for policy in policies:
         policy_data = {
             'policy_id': policy.get('policy_id', str(uuid.uuid4())),
@@ -305,7 +317,7 @@ def generate_policy():
     def generate_single_policy(policy_name, policy_comment, src_intfs, dst_intfs, src_addrs, dst_addrs, svc_names, action, ssl_ssh_profile, webfilter_profile, application_list, ips_sensor, logtraffic, logtraffic_start, auto_asic_offload, nat, services, include_custom_services=True):
         if not src_intfs or not dst_intfs or not src_addrs or not dst_addrs or not svc_names:
             logger.warning(f"Skipping policy generation for {policy_name} due to missing required fields")
-            return ""  # Return empty string if required fields are missing
+            return ""
 
         cli_commands = "config firewall policy\n"
         cli_commands += "edit 0\n"
@@ -381,7 +393,6 @@ def generate_policy():
         logger.debug(f"Auto ASIC Offload: {auto_asic_offload}")
         logger.debug(f"NAT: {nat}")
 
-        # Generate service names
         service_names = []
         for svc in services:
             if svc['type'] == 'group':
@@ -488,9 +499,7 @@ def generate_policy():
             "output3": output3 if output3 else "No policy generated due to missing interfaces or services."
         })
 
-    response = {
-        "outputs": all_outputs
-    }
+    response = {"outputs": all_outputs}
     logger.debug("Returning response with all outputs")
     return jsonify(response)
 
@@ -516,8 +525,6 @@ def parse_config():
         logger.warning(f"Failed to delete temp file {temp_path}: {e}")
     logger.debug("Config file content length: %d bytes", len(content))
 
-    logger.debug("Config file snippet (first 500 chars):\n%s", content[:500])
-
     interfaces = []
     addresses = []
     services = []
@@ -527,7 +534,6 @@ def parse_config():
     application_lists = []
     ips_sensors = []
 
-    # Parse interfaces
     interface_pattern = re.compile(r'config system interface\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in interface_pattern.finditer(content):
         interface_name = match.group(1)
@@ -554,16 +560,12 @@ def parse_config():
                         interfaces.append(interface_name)
                         logger.debug("Found interface (fallback): %s", interface_name)
 
-    logger.debug("Parsed interfaces: %s", interfaces)
-
-    # Parse addresses
     address_pattern = re.compile(r'config firewall address\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in address_pattern.finditer(content):
         address_name = match.group(1)
         addresses.append(address_name)
         logger.debug("Found address: %s", address_name)
 
-    # Parse address groups
     addrgrp_pattern = re.compile(r'config firewall addrgrp\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in addrgrp_pattern.finditer(content):
         addrgrp_name = match.group(1)
@@ -571,7 +573,6 @@ def parse_config():
             addresses.append(addrgrp_name)
             logger.debug("Found address group: %s", addrgrp_name)
 
-    # Fallback parsing for addresses and address groups
     if not addresses or len(addresses) == 1:
         logger.debug("Falling back to line-by-line address and address group parsing")
         lines = content.splitlines()
@@ -597,7 +598,6 @@ def parse_config():
                         addresses.append(address_name)
                         logger.debug("Found %s (fallback): %s", "address group" if inside_addrgrp_section else "address", address_name)
 
-    # Parse addresses from firewall policies as fallback
     policy_addr_pattern = re.compile(r'set (?:srcaddr|dstaddr)\s+((?:"[^"]+"\s*)+)', re.DOTALL)
     for match in policy_addr_pattern.finditer(content):
         addr_list = [addr.strip('"') for addr in match.group(1).split()]
@@ -606,9 +606,6 @@ def parse_config():
                 addresses.append(addr)
                 logger.debug("Found address from policy: %s", addr)
 
-    logger.debug("Final parsed addresses: %s", addresses)
-
-    # Parse services
     service_pattern = re.compile(
         r'config firewall service custom\s+edit\s+"([^"]+)"\s+((?:set\s+[^\n]+\n)*)\s+next',
         re.DOTALL
@@ -616,16 +613,14 @@ def parse_config():
     for match in service_pattern.finditer(content):
         service_name = match.group(1)
         service_config = match.group(2)
-        protocol = 'TCP'  # Default protocol
-        port = '0'        # Default port
+        protocol = 'TCP'
+        port = '0'
 
-        # Try to extract protocol and port
         protocol_match = re.search(r'set\s+(\w+)\s+([^\n]+)', service_config)
         if protocol_match:
             protocol = protocol_match.group(1).upper()
             port = protocol_match.group(2).strip()
         else:
-            # Fallback: look for common attributes
             if 'tcp' in service_config.lower():
                 protocol = 'TCP'
             elif 'udp' in service_config.lower():
@@ -637,17 +632,14 @@ def parse_config():
         services.append({"name": service_name, "protocol": protocol, "port": port})
         logger.debug("Found service: %s (protocol: %s, port: %s)", service_name, protocol, port)
 
-    # Fallback: Parse services from firewall policies
     policy_service_pattern = re.compile(r'set service\s+((?:"[^"]+"\s*)+)', re.DOTALL)
     for match in policy_service_pattern.finditer(content):
         svc_list = [svc.strip('"') for svc in match.group(1).split()]
         for svc in svc_list:
             if svc not in [s['name'] for s in services] and svc not in service_groups:
-                # Assume unknown services are TCP with port 0 (generic)
                 services.append({"name": svc, "protocol": "TCP", "port": "0"})
                 logger.debug("Found service from policy (fallback): %s (protocol: TCP, port: 0)", svc)
 
-    # Parse service groups
     service_group_pattern = re.compile(r'config firewall service group\s+edit\s+"([^"]+)"\s+set member\s+([^\n]+)\s+next', re.DOTALL)
     for match in service_group_pattern.finditer(content):
         group_name = match.group(1)
@@ -655,28 +647,24 @@ def parse_config():
         service_groups[group_name] = members
         logger.debug("Found service group: %s with members: %s", group_name, members)
 
-    # Parse SSL/SSH profiles
     ssl_ssh_pattern = re.compile(r'config firewall ssl-ssh-profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in ssl_ssh_pattern.finditer(content):
         profile_name = match.group(1)
         ssl_ssh_profiles.append(profile_name)
         logger.debug("Found SSL/SSH profile: %s", profile_name)
 
-    # Parse webfilter profiles
     webfilter_pattern = re.compile(r'config webfilter profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in webfilter_pattern.finditer(content):
         profile_name = match.group(1)
         webfilter_profiles.append(profile_name)
         logger.debug("Found webfilter profile: %s", profile_name)
 
-    # Parse application lists
     application_pattern = re.compile(r'config application list\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in application_pattern.finditer(content):
         list_name = match.group(1)
         application_lists.append(list_name)
         logger.debug("Found application list: %s", list_name)
 
-    # Parse IPS sensors
     ips_pattern = re.compile(r'config ips sensor\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in ips_pattern.finditer(content):
         sensor_name = match.group(1)
@@ -699,9 +687,4 @@ def parse_config():
 
 if __name__ == '__main__':
     logger.info("Starting Flask application on host 0.0.0.0, port 5000")
-    import requests
-    try:
-        requests.post('http://localhost:5000/log', json={"message": "Test log at startup"})
-    except Exception as e:
-        logger.error("Failed to send test log at startup: %s", str(e))
     app.run(host='0.0.0.0', port=5000, debug=False)
