@@ -4,6 +4,7 @@ import re
 import logging
 import os
 import tempfile
+import uuid
 
 # Clear all existing handlers to ensure clean logging setup
 for handler in logging.root.handlers[:]:
@@ -117,32 +118,44 @@ def save_template():
         logger.error("No template name provided")
         return jsonify({"error": "Template name is required"}), 400
 
-    # Explicitly capture all form fields, including empty ones
+    # Parse policies from form data
+    policies = json.loads(data.get('policies', '[]')) or []
+    if not policies:
+        logger.error("No policies provided")
+        return jsonify({"error": "At least one policy is required"}), 400
+
+    # Structure template data with multiple policies
     template_data = {
-        'policy_name': data.get('policy_name', ''),
-        'policy_comment': data.get('policy_comment', ''),
-        'src_interfaces': data.getlist('src_interfaces[]') or [],
-        'dst_interfaces': data.getlist('dst_interfaces[]') or [],
-        'src_addresses': data.getlist('src_addresses[]') or [],
-        'dst_addresses': data.getlist('dst_addresses[]') or [],
-        'services': json.loads(data.get('services', '[]')) or [],
-        'action': data.get('action', ''),
-        'ssl_ssh_profile': data.get('ssl_ssh_profile', ''),
-        'webfilter_profile': data.get('webfilter_profile', ''),
-        'application_list': data.get('application_list', ''),
-        'ips_sensor': data.get('ips_sensor', ''),
-        'logtraffic': data.get('logtraffic', ''),
-        'logtraffic_start': data.get('logtraffic_start', ''),
-        'auto_asic_offload': data.get('auto_asic_offload', ''),
-        'nat': data.get('nat', '')
+        'policies': []
     }
+    for policy in policies:
+        policy_data = {
+            'policy_id': policy.get('policy_id', str(uuid.uuid4())),
+            'policy_name': policy.get('policy_name', ''),
+            'policy_comment': policy.get('policy_comment', ''),
+            'src_interfaces': policy.get('src_interfaces', []),
+            'dst_interfaces': policy.get('dst_interfaces', []),
+            'src_addresses': policy.get('src_addresses', []),
+            'dst_addresses': policy.get('dst_addresses', []),
+            'services': policy.get('services', []),
+            'action': policy.get('action', ''),
+            'ssl_ssh_profile': policy.get('ssl_ssh_profile', ''),
+            'webfilter_profile': policy.get('webfilter_profile', ''),
+            'application_list': policy.get('application_list', ''),
+            'ips_sensor': policy.get('ips_sensor', ''),
+            'logtraffic': policy.get('logtraffic', ''),
+            'logtraffic_start': policy.get('logtraffic_start', ''),
+            'auto_asic_offload': policy.get('auto_asic_offload', ''),
+            'nat': policy.get('nat', '')
+        }
+        template_data['policies'].append(policy_data)
 
     templates = load_templates()
     templates = [t for t in templates if t['name'] != template_name]
     templates.append({'name': template_name, 'data': template_data})
 
     save_templates(templates)
-    logger.debug(f"Template '{template_name}' saved with data: {template_data}")
+    logger.debug(f"Template '{template_name}' saved with {len(template_data['policies'])} policies")
     return jsonify({"status": "success", "message": f"Template '{template_name}' saved"})
 
 @app.route('/load_templates', methods=['GET'])
@@ -181,60 +194,24 @@ def delete_template(template_name):
 def generate_policy():
     logger.debug("Received request to generate policy")
     data = request.form
-    policy_name = data.get('policy_name', 'policy')
-    policy_comment = data.get('policy_comment', 'policy')
-    src_interfaces = data.getlist('src_interfaces[]')
-    dst_interfaces = data.getlist('dst_interfaces[]')
-    src_addresses = data.getlist('src_addresses[]')
-    dst_addresses = data.getlist('dst_addresses[]')
-    services = json.loads(data.get('services', '[]'))
-    action = data.get('action', 'accept')
-    ssl_ssh_profile = data.get('ssl_ssh_profile', '')
-    webfilter_profile = data.get('webfilter_profile', '')
-    application_list = data.get('application_list', '')
-    ips_sensor = data.get('ips_sensor', '')  # Corrected line
-    logtraffic = data.get('logtraffic', 'all')
-    logtraffic_start = data.get('logtraffic_start', 'enable')
-    auto_asic_offload = data.get('auto_asic_offload', 'enable')
-    nat = data.get('nat', 'enable')
+    policies = json.loads(data.get('policies', '[]')) or []
+    if not policies:
+        logger.error("No policies provided")
+        return jsonify({"error": "At least one policy is required"}), 400
 
-    # Rest of the function remains unchanged
-    logger.debug(f"Policy Name: {policy_name}")
-    logger.debug(f"Policy Comment: {policy_comment}")
-    logger.debug(f"Source Interfaces: {src_interfaces}")
-    logger.debug(f"Destination Interfaces: {dst_interfaces}")
-    logger.debug(f"Source Addresses: {src_addresses}")
-    logger.debug(f"Destination Addresses: {dst_addresses}")
-    logger.debug(f"Services: {services}")
-    logger.debug(f"Action: {action}")
-    logger.debug(f"SSL/SSH Profile: {ssl_ssh_profile}")
-    logger.debug(f"Webfilter Profile: {webfilter_profile}")
-    logger.debug(f"Application List: {application_list}")
-    logger.debug(f"IPS Sensor: {ips_sensor}")
-    logger.debug(f"Log Traffic: {logtraffic}")
-    logger.debug(f"Log Traffic Start: {logtraffic_start}")
-    logger.debug(f"Auto ASIC Offload: {auto_asic_offload}")
-    logger.debug(f"NAT: {nat}")
+    def generate_single_policy(policy_name, policy_comment, src_intfs, dst_intfs, src_addrs, dst_addrs, svc_names, action, ssl_ssh_profile, webfilter_profile, application_list, ips_sensor, logtraffic, logtraffic_start, auto_asic_offload, nat, services, include_custom_services=True):
+        if not src_intfs or not dst_intfs or not src_addrs or not dst_addrs or not svc_names:
+            logger.warning(f"Skipping policy generation for {policy_name} due to missing required fields")
+            return ""  # Return empty string if required fields are missing
 
-    service_names = []
-    for svc in services:
-        if svc['type'] == 'group':
-            service_names.append(svc['name'])
-        elif svc['type'] == 'template':
-            service_names.append(svc['name'])
-        else:
-            svc_name = f"custom_{svc['name']}"
-            service_names.append(svc_name)
-
-    def generate_single_policy(policy_name, policy_comment, src_intfs, dst_intfs, src_addrs, dst_addrs, svc_names, action, ssl_ssh_profile, webfilter_profile, application_list, ips_sensor, logtraffic, logtraffic_start, auto_asic_offload, nat, include_custom_services=True):
         cli_commands = "config firewall policy\n"
         cli_commands += "edit 0\n"
         cli_commands += f'set name "{policy_name}"\n'
         cli_commands += f'set comments "{policy_comment}"\n'
-        cli_commands += "set srcintf " + " ".join([f'"{intf}"' for intf in src_intfs]) + "\n"
-        cli_commands += "set dstintf " + " ".join([f'"{intf}"' for intf in dst_intfs]) + "\n"
-        cli_commands += "set srcaddr " + " ".join([f'"{addr}"' for addr in src_addrs]) + "\n"
-        cli_commands += "set dstaddr " + " ".join([f'"{addr}"' for addr in dst_addrs]) + "\n"
+        cli_commands += "set srcintf " + " ".join([f'"{intf}"' for intf in src_intfs if intf]) + "\n"
+        cli_commands += "set dstintf " + " ".join([f'"{intf}"' for intf in dst_intfs if intf]) + "\n"
+        cli_commands += "set srcaddr " + " ".join([f'"{addr}"' for addr in src_addrs if addr]) + "\n"
+        cli_commands += "set dstaddr " + " ".join([f'"{addr}"' for addr in dst_addrs if addr]) + "\n"
 
         if include_custom_services:
             for svc in services:
@@ -245,7 +222,7 @@ def generate_policy():
                     cli_commands += f"set {svc['protocol'].lower()} {svc['port']}\n"
                     cli_commands += "next\nend\n"
 
-        cli_commands += "set service " + " ".join([f'"{svc}"' for svc in svc_names]) + "\n"
+        cli_commands += "set service " + " ".join([f'"{svc}"' for svc in svc_names if svc]) + "\n"
         cli_commands += f'set action {action}\n'
         cli_commands += 'set schedule "always"\n'
         if ssl_ssh_profile or webfilter_profile or application_list or ips_sensor:
@@ -265,37 +242,62 @@ def generate_policy():
         cli_commands += "next\nend\n"
         return cli_commands
 
-    output1 = generate_single_policy(
-        policy_name=policy_name,
-        policy_comment=policy_comment,
-        src_intfs=src_interfaces,
-        dst_intfs=dst_interfaces,
-        src_addrs=src_addresses,
-        dst_addrs=dst_addresses,
-        svc_names=service_names,
-        action=action,
-        ssl_ssh_profile=ssl_ssh_profile,
-        webfilter_profile=webfilter_profile,
-        application_list=application_list,
-        ips_sensor=ips_sensor,
-        logtraffic=logtraffic,
-        logtraffic_start=logtraffic_start,
-        auto_asic_offload=auto_asic_offload,
-        nat=nat
-    )
-    logger.debug("Output 1 (All in one policy):\n%s", output1)
+    all_outputs = []
+    for policy in policies:
+        policy_name = policy.get('policy_name', 'policy')
+        policy_comment = policy.get('policy_comment', 'policy')
+        src_interfaces = policy.get('src_interfaces', [])
+        dst_interfaces = policy.get('dst_interfaces', [])
+        src_addresses = policy.get('src_addresses', [])
+        dst_addresses = policy.get('dst_addresses', [])
+        services = policy.get('services', [])
+        action = policy.get('action', 'accept')
+        ssl_ssh_profile = policy.get('ssl_ssh_profile', '')
+        webfilter_profile = policy.get('webfilter_profile', '')
+        application_list = policy.get('application_list', '')
+        ips_sensor = policy.get('ips_sensor', '')
+        logtraffic = policy.get('logtraffic', 'all')
+        logtraffic_start = policy.get('logtraffic_start', 'enable')
+        auto_asic_offload = policy.get('auto_asic_offload', 'enable')
+        nat = policy.get('nat', 'enable')
 
-    output2 = ""
-    for svc in service_names:
-        policy_name_svc = f"{policy_name}-{svc}"
-        output2 += generate_single_policy(
-            policy_name=policy_name_svc,
+        logger.debug(f"Generating policy: {policy_name}")
+        logger.debug(f"Policy Comment: {policy_comment}")
+        logger.debug(f"Source Interfaces: {src_interfaces}")
+        logger.debug(f"Destination Interfaces: {dst_interfaces}")
+        logger.debug(f"Source Addresses: {src_addresses}")
+        logger.debug(f"Destination Addresses: {dst_addresses}")
+        logger.debug(f"Services: {services}")
+        logger.debug(f"Action: {action}")
+        logger.debug(f"SSL/SSH Profile: {ssl_ssh_profile}")
+        logger.debug(f"Webfilter Profile: {webfilter_profile}")
+        logger.debug(f"Application List: {application_list}")
+        logger.debug(f"IPS Sensor: {ips_sensor}")
+        logger.debug(f"Log Traffic: {logtraffic}")
+        logger.debug(f"Log Traffic Start: {logtraffic_start}")
+        logger.debug(f"Auto ASIC Offload: {auto_asic_offload}")
+        logger.debug(f"NAT: {nat}")
+
+        # Generate service names
+        service_names = []
+        for svc in services:
+            if svc['type'] == 'group':
+                service_names.append(svc['name'])
+            elif svc['type'] == 'template':
+                service_names.append(svc['name'])
+            elif svc['type'] == 'custom':
+                svc_name = f"custom_{svc['name']}"
+                service_names.append(svc_name)
+
+        # Output 1: All-in-One Policy
+        output1 = generate_single_policy(
+            policy_name=policy_name,
             policy_comment=policy_comment,
             src_intfs=src_interfaces,
             dst_intfs=dst_interfaces,
             src_addrs=src_addresses,
             dst_addrs=dst_addresses,
-            svc_names=[svc],
+            svc_names=service_names,
             action=action,
             ssl_ssh_profile=ssl_ssh_profile,
             webfilter_profile=webfilter_profile,
@@ -305,21 +307,20 @@ def generate_policy():
             logtraffic_start=logtraffic_start,
             auto_asic_offload=auto_asic_offload,
             nat=nat,
-            include_custom_services=True
+            services=services
         )
-        output2 += "\n"
-    logger.debug("Output 2 (One policy per service):\n%s", output2)
+        logger.debug("Output 1 (All in one policy):\n%s", output1)
 
-    output3 = ""
-    for src_intf in src_interfaces:
-        for dst_intf in dst_interfaces:
+        # Output 2: One Policy Per Service
+        output2 = ""
+        if service_names:
             for svc in service_names:
-                policy_name_intf_svc = f"{policy_name}-{src_intf}-{dst_intf}-{svc}"
-                output3 += generate_single_policy(
-                    policy_name=policy_name_intf_svc,
+                policy_name_svc = f"{policy_name}-{svc}"
+                output2 += generate_single_policy(
+                    policy_name=policy_name_svc,
                     policy_comment=policy_comment,
-                    src_intfs=[src_intf],
-                    dst_intfs=[dst_intf],
+                    src_intfs=src_interfaces,
+                    dst_intfs=dst_interfaces,
                     src_addrs=src_addresses,
                     dst_addrs=dst_addresses,
                     svc_names=[svc],
@@ -332,15 +333,60 @@ def generate_policy():
                     logtraffic_start=logtraffic_start,
                     auto_asic_offload=auto_asic_offload,
                     nat=nat,
-                    include_custom_services=True
+                    services=services
                 )
-                output3 += "\n"
-    logger.debug("Output 3 (One policy per src interface, dst interface, and service):\n%s", output3)
+                output2 += "\n" if output2 else ""
+        else:
+            output2 = "No services defined for this policy."
+        logger.debug("Output 2 (One policy per service):\n%s", output2)
+
+        # Output 3: One Policy Per Src Interface, Dst Interface, and Service
+        output3 = ""
+        if src_interfaces and dst_interfaces and service_names:
+            for src_intf in src_interfaces:
+                if not src_intf:
+                    continue
+                for dst_intf in dst_interfaces:
+                    if not dst_intf:
+                        continue
+                    for svc in service_names:
+                        if not svc:
+                            continue
+                        policy_name_intf_svc = f"{policy_name}-{src_intf}-{dst_intf}-{svc}"
+                        output3 += generate_single_policy(
+                            policy_name=policy_name_intf_svc,
+                            policy_comment=policy_comment,
+                            src_intfs=[src_intf],
+                            dst_intfs=[dst_intf],
+                            src_addrs=src_addresses,
+                            dst_addrs=dst_addresses,
+                            svc_names=[svc],
+                            action=action,
+                            ssl_ssh_profile=ssl_ssh_profile,
+                            webfilter_profile=webfilter_profile,
+                            application_list=application_list,
+                            ips_sensor=ips_sensor,
+                            logtraffic=logtraffic,
+                            logtraffic_start=logtraffic_start,
+                            auto_asic_offload=auto_asic_offload,
+                            nat=nat,
+                            services=services
+                        )
+                        output3 += "\n" if output3 else ""
+        else:
+            output3 = "No valid source interfaces, destination interfaces, or services defined for this policy."
+        logger.debug("Output 3 (One policy per src interface, dst interface, and service):\n%s", output3)
+
+        all_outputs.append({
+            "policy_id": policy.get('policy_id', str(uuid.uuid4())),
+            "policy_name": policy_name,
+            "output1": output1 if output1 else "No policy generated due to missing fields.",
+            "output2": output2 if output2 else "No policy generated due to missing services.",
+            "output3": output3 if output3 else "No policy generated due to missing interfaces or services."
+        })
 
     response = {
-        "output1": output1,
-        "output2": output2,
-        "output3": output3
+        "outputs": all_outputs
     }
     logger.debug("Returning response with all outputs")
     return jsonify(response)
@@ -378,7 +424,7 @@ def parse_config():
     application_lists = []
     ips_sensors = []
 
-    # Parse interfaces (unchanged)
+    # Parse interfaces
     interface_pattern = re.compile(r'config system interface\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in interface_pattern.finditer(content):
         interface_name = match.group(1)
@@ -459,7 +505,7 @@ def parse_config():
 
     logger.debug("Final parsed addresses: %s", addresses)
 
-    # Parse services (improved regex and fallback)
+    # Parse services
     service_pattern = re.compile(
         r'config firewall service custom\s+edit\s+"([^"]+)"\s+((?:set\s+[^\n]+\n)*)\s+next',
         re.DOTALL
@@ -498,7 +544,7 @@ def parse_config():
                 services.append({"name": svc, "protocol": "TCP", "port": "0"})
                 logger.debug("Found service from policy (fallback): %s (protocol: TCP, port: 0)", svc)
 
-    # Parse service groups (unchanged)
+    # Parse service groups
     service_group_pattern = re.compile(r'config firewall service group\s+edit\s+"([^"]+)"\s+set member\s+([^\n]+)\s+next', re.DOTALL)
     for match in service_group_pattern.finditer(content):
         group_name = match.group(1)
@@ -506,28 +552,28 @@ def parse_config():
         service_groups[group_name] = members
         logger.debug("Found service group: %s with members: %s", group_name, members)
 
-    # Parse SSL/SSH profiles (unchanged)
+    # Parse SSL/SSH profiles
     ssl_ssh_pattern = re.compile(r'config firewall ssl-ssh-profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in ssl_ssh_pattern.finditer(content):
         profile_name = match.group(1)
         ssl_ssh_profiles.append(profile_name)
         logger.debug("Found SSL/SSH profile: %s", profile_name)
 
-    # Parse webfilter profiles (unchanged)
+    # Parse webfilter profiles
     webfilter_pattern = re.compile(r'config webfilter profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in webfilter_pattern.finditer(content):
         profile_name = match.group(1)
         webfilter_profiles.append(profile_name)
         logger.debug("Found webfilter profile: %s", profile_name)
 
-    # Parse application lists (unchanged)
+    # Parse application lists
     application_pattern = re.compile(r'config application list\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in application_pattern.finditer(content):
         list_name = match.group(1)
         application_lists.append(list_name)
         logger.debug("Found application list: %s", list_name)
 
-    # Parse IPS sensors (unchanged)
+    # Parse IPS sensors
     ips_pattern = re.compile(r'config ips sensor\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in ips_pattern.finditer(content):
         sensor_name = match.group(1)

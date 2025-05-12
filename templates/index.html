@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FortiGate Policy Generator</title>
-	<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <style>
         body {
             background-color: #f3f4f6;
@@ -25,6 +25,60 @@
         html, body {
             width: 100%;
             min-height: 100vh;
+        }
+        .policy-list-container {
+            width: 20%;
+            background-color: #ffffff;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+        .policy-list-container h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        .policy-list {
+            list-style: none;
+            padding: 0;
+        }
+        .policy-list li {
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 4px;
+        }
+        .policy-list li:hover {
+            background-color: #f3f4f6;
+        }
+        .policy-list li.active {
+            background-color: #e5e7eb;
+            font-weight: 600;
+        }
+        .policy-list li button {
+            background-color: #dc2626;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            margin-left: 8px;
+            cursor: pointer;
+        }
+        .policy-list li button:hover {
+            background-color: #b91c1c;
+        }
+        .policy-list-container button.add-policy-btn {
+            background-color: #2563eb;
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            width: 100%;
+            margin-top: 16px;
+        }
+        .policy-list-container button.add-policy-btn:hover {
+            background-color: #1d4ed8;
         }
         .form-container {
             background-color: #ffffff;
@@ -158,7 +212,7 @@
             background-color: #b91c1c;
         }
         .output-container {
-            width: 60%;
+            width: 40%;
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -179,6 +233,7 @@
             background-color: #ffffff;
             padding: 16px;
             flex: 1;
+            overflow-y: auto;
         }
         .output-panel .header {
             display: flex;
@@ -229,8 +284,20 @@
             overflow: auto;
             font-size: 14px;
             white-space: pre-wrap;
-            height: 100%;
             margin: 0;
+        }
+        .output-panel .policy-section {
+            margin-bottom: 16px;
+        }
+        .output-panel .policy-section h3 {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #4b5563;
+        }
+        .output-panel .policy-section pre {
+            border-left: 3px solid #d1d5db;
+            padding-left: 12px;
         }
         .searchable-dropdown {
             position: relative;
@@ -277,30 +344,39 @@
 </head>
 <body>
     <div class="container">
-        <!-- Form Section (Left) -->
+        <!-- Policy List Section (Left) -->
+        <div class="policy-list-container">
+            <h2>Policies</h2>
+            <ul class="policy-list" id="policyList">
+                <!-- Policies will be dynamically added here -->
+            </ul>
+            <button class="add-policy-btn" onclick="addPolicy()">Add Policy</button>
+        </div>
+        <!-- Form Section (Middle) -->
         <div class="form-container">
             <h1>FGT Policy Generator</h1>
-			<div class="mb-4">
-				<label>Template Management</label>
-				<div class="flex gap-4">
-					<input type="text" id="templateName" placeholder="Template Name" class="w-1-3">
-					<button type="button" onclick="saveTemplate()" class="submit-btn w-1-6">Save Template</button>
-					<div class="searchable-dropdown w-1-1">
-						<input type="text" class="search-input" placeholder="Load Template..." onfocus="loadTemplateOptions(this)" oninput="filterDropdown(this)">
-						<input type="hidden" id="loadTemplate" class="hidden-input">
-						<div class="dropdown-list" id="templateDropdown">
-							<li data-value="">Select Template</li>
-						</div>
-					</div>
-					<button type="button" onclick="deleteTemplate()" class="delete-template-btn w-1-6">Delete Template</button>
-				</div>
-			</div>
+            <div class="mb-4">
+                <label>Template Management</label>
+                <div class="flex gap-4">
+                    <input type="text" id="templateName" placeholder="Template Name" class="w-1-3">
+                    <button type="button" onclick="saveTemplate()" class="submit-btn w-1-6">Save Template</button>
+                    <div class="searchable-dropdown w-1-1">
+                        <input type="text" class="search-input" placeholder="Load Template..." onfocus="loadTemplateOptions(this)" oninput="filterDropdown(this)">
+                        <input type="hidden" id="loadTemplate" class="hidden-input">
+                        <div class="dropdown-list" id="templateDropdown">
+                            <li data-value="">Select Template</li>
+                        </div>
+                    </div>
+                    <button type="button" onclick="deleteTemplate()" class="delete-template-btn w-1-6">Delete Template</button>
+                </div>
+            </div>
             <div class="mb-4">
                 <label>Import FortiGate Config</label>
                 <input type="file" id="configFile" accept=".txt,.conf">
                 <button type="button" onclick="importConfig()" class="import-btn">Import Config</button>
             </div>
             <form id="policyForm" class="space-y-2">
+                <input type="hidden" name="policy_id" id="policyId">
                 <div>
                     <label>Policy Name</label>
                     <input type="text" name="policy_name" placeholder="e.g., Internet-Access" required>
@@ -499,33 +575,34 @@
                     </div>
                 </div>
                 <div class="gap-4">
-                    <button type="submit" class="submit-btn">Generate Policy</button>
+                    <button type="button" onclick="savePolicy()" class="submit-btn">Save Policy</button>
                     <button type="button" onclick="clearForm()" class="clear-btn">Clear Form</button>
                 </div>
             </form>
+            <button type="button" onclick="generatePolicies()" class="submit-btn" style="margin-top: 16px;">Generate All Policies</button>
         </div>
         <!-- Output Section (Right) -->
         <div id="output" class="output-container hidden">
             <div class="output-panel">
                 <div class="header">
-                    <h2 class="blue">Output 1: All-in-One Policy</h2>
+                    <h2 class="blue">Output 1: All-in-One Policies</h2>
                     <button onclick="copyToClipboard('out1')" class="blue">Copy</button>
                 </div>
-                <pre id="out1"></pre>
+                <div id="out1"></div>
             </div>
             <div class="output-panel">
                 <div class="header">
                     <h2 class="green">Output 2: One Policy Per Service</h2>
                     <button onclick="copyToClipboard('out2')" class="green">Copy</button>
                 </div>
-                <pre id="out2"></pre>
+                <div id="out2"></div>
             </div>
             <div class="output-panel">
                 <div class="header">
                     <h2 class="purple">Output 3: Per Src/Dst Interface and Service</h2>
                     <button onclick="copyToClipboard('out3')" class="purple">Copy</button>
                 </div>
-                <pre id="out3"></pre>
+                <div id="out3"></div>
             </div>
         </div>
     </div>
@@ -563,6 +640,9 @@
         let webfilterProfiles = [];
         let applicationLists = [];
         let ipsSensors = [];
+        let policies = [];
+        let currentPolicyId = null;
+        let recentlyUsedServices = [];
 
         async function sendLog(message) {
             console.log(message);
@@ -585,15 +665,12 @@
             }
         }
 
-		function showDropdown(input) {
-			const dropdown = input.nextElementSibling.nextElementSibling;
-			
-			// Clear the input value for all dropdowns
-			input.value = ''; // Clear the input for search
-
-			dropdown.classList.add('active');
-			filterDropdown(input);
-		}
+        function showDropdown(input) {
+            const dropdown = input.nextElementSibling.nextElementSibling;
+            input.value = '';
+            dropdown.classList.add('active');
+            filterDropdown(input);
+        }
 
         function hideDropdown(input) {
             setTimeout(() => {
@@ -646,6 +723,13 @@
 
             if (input.classList.contains('service-search')) {
                 handleServiceChange(input);
+                if (value && value.startsWith('service:')) {
+                    const serviceName = value.split(':')[1];
+                    recentlyUsedServices = recentlyUsedServices.filter(name => name !== serviceName);
+                    recentlyUsedServices.unshift(serviceName);
+                    recentlyUsedServices = recentlyUsedServices.slice(0, 5);
+                    sendLog(`Updated recentlyUsedServices: ${recentlyUsedServices}`);
+                }
             }
         }
 
@@ -657,6 +741,7 @@
         function clearForm() {
             const form = document.getElementById('policyForm');
             form.reset();
+            document.getElementById('policyId').value = '';
 
             ['srcInterfaces', 'dstInterfaces', 'srcAddresses', 'dstAddresses'].forEach(id => {
                 const container = document.getElementById(id);
@@ -741,11 +826,15 @@
                 }
             });
 
-            document.getElementById('output').classList.add('hidden');
+            currentPolicyId = null;
+            updatePolicyList();
         }
 
         async function copyToClipboard(elementId) {
-            const text = document.getElementById(elementId).textContent;
+            const element = document.getElementById(elementId);
+            const text = Array.from(element.querySelectorAll('pre'))
+                .map(pre => pre.textContent)
+                .join('\n\n');
             try {
                 await navigator.clipboard.writeText(text);
                 sendLog(`Copied content of ${elementId} to clipboard`);
@@ -828,6 +917,8 @@
                             <li class="group-label">Individual Services</li>
                             ${Object.keys(serviceTemplates).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
                             <li data-value="custom">Custom</li>
+                            <li class="group-label">Recently Used</li>
+                            ${recentlyUsedServices.slice(0, 5).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
                         </div>
                     </div>
                     <input type="text" placeholder="Protocol" class="w-1-3 protocol" disabled>
@@ -990,6 +1081,8 @@
                         <li class="group-label">Individual Services</li>
                         ${Object.keys(serviceTemplates).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
                         <li data-value="custom">Custom</li>
+                        <li class="group-label">Recently Used</li>
+                        ${recentlyUsedServices.slice(0, 5).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
                     `;
                     const searchInput = dropdown.querySelector('.search-input');
                     list.querySelectorAll('li:not(.group-label)').forEach(li => {
@@ -1047,30 +1140,16 @@
                 alert('Please provide a template name.');
                 return;
             }
+            if (!policies.length) {
+                sendLog('No policies to save');
+                alert('Please add at least one policy to save.');
+                return;
+            }
 
             sendLog(`Saving template: ${templateName}`);
-            const form = document.getElementById('policyForm');
-            const formData = new FormData(form);
+            const formData = new FormData();
             formData.append('template_name', templateName);
-
-            const services = [];
-            document.querySelectorAll('#services > div').forEach(div => {
-                const searchInput = div.querySelector('.service-search');
-                const hiddenInput = searchInput.nextElementSibling;
-                const protocol = div.querySelector('.protocol').value;
-                const port = div.querySelector('.port').value;
-                const value = hiddenInput.value;
-                if (value) {
-                    if (value.startsWith('group:')) {
-                        services.push({ name: value.split(':')[1], type: 'group' });
-                    } else if (value === 'custom') {
-                        services.push({ name: `${protocol}_${port}`, type: 'custom', protocol, port });
-                    } else {
-                        services.push({ name: value.split(':')[1], type: 'template', protocol, port });
-                    }
-                }
-            });
-            formData.append('services', JSON.stringify(services));
+            formData.append('policies', JSON.stringify(policies));
 
             try {
                 const response = await fetch('/save_template', {
@@ -1098,88 +1177,18 @@
                 const result = await response.json();
                 if (result.status === 'success') {
                     const data = result.data;
+                    policies = data.policies || [];
+                    currentPolicyId = null;
                     clearForm();
-
-                    document.querySelector('input[name="policy_name"]').value = data.policy_name;
-                    document.querySelector('input[name="policy_comment"]').value = data.policy_comment;
-
-                    ['srcInterfaces', 'dstInterfaces', 'srcAddresses', 'dstAddresses'].forEach(containerId => {
-                        const container = document.getElementById(containerId);
-                        container.innerHTML = '';
-                        const fieldName = containerId === 'srcInterfaces' ? 'src_interfaces[]' :
-                                         containerId === 'dstInterfaces' ? 'dst_interfaces[]' :
-                                         containerId === 'srcAddresses' ? 'src_addresses[]' : 'dst_addresses[]';
-                        const items = data[fieldName.replace('[]', '')];
-                        items.forEach(item => {
-                            const div = document.createElement('div');
-                            div.className = 'flex items-center';
-                            div.innerHTML = `
-                                <div class="searchable-dropdown">
-                                    <input type="text" class="search-input" placeholder="Search ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}..." value="${item}" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                    <input type="hidden" name="${fieldName}" class="hidden-input" value="${item}" required>
-                                    <div class="dropdown-list">
-                                        <li data-value="">Select ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}</li>
-                                        ${(containerId.includes('Interfaces') ? availableInterfaces : availableAddresses).map(val => `<li data-value="${val}">${val}</li>`).join('')}
-                                    </div>
-                                </div>
-                                <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                            `;
-                            container.appendChild(div);
-                            div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                                li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
-                            });
-                        });
-                    });
-
-                    const servicesContainer = document.getElementById('services');
-                    servicesContainer.innerHTML = '';
-                    data.services.forEach(svc => {
-                        const div = document.createElement('div');
-                        div.className = 'flex items-center';
-                        const value = svc.type === 'group' ? `group:${svc.name}` : svc.type === 'template' ? `service:${svc.name}` : 'custom';
-                        const displayName = svc.type === 'custom' ? svc.name : svc.name;
-                        const protocol = svc.protocol || '';
-                        const port = svc.port || '';
-                        div.innerHTML = `
-                            <div class="flex w-full">
-                                <div class="searchable-dropdown w-2-3">
-                                    <input type="text" class="search-input service-search" value="${displayName}" placeholder="Search Service/Group..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                    <input type="hidden" class="hidden-input" value="${value}">
-                                    <div class="dropdown-list">
-                                        <li data-value="">Select Service/Group</li>
-                                        <li class="group-label">Service Groups</li>
-                                        ${Object.keys(groupTemplates).map(name => `<li data-value="group:${name}">${name}</li>`).join('')}
-                                        <li class="group-label">Individual Services</li>
-                                        ${Object.keys(serviceTemplates).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
-                                        <li data-value="custom">Custom</li>
-                                    </div>
-                                </div>
-                                <input type="text" placeholder="Protocol" class="w-1-3 protocol" value="${protocol}" ${svc.type !== 'custom' ? 'disabled' : ''}>
-                                <input type="text" placeholder="Port" class="w-1-3 port" value="${port}" ${svc.type !== 'custom' ? 'disabled' : ''}>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        `;
-                        servicesContainer.appendChild(div);
-                        div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                            li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
-                        });
-                    });
-
-                    ['action', 'ssl_ssh_profile', 'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat'].forEach(field => {
-                        const dropdown = document.querySelector(`input[name="${field}"]`)?.parentElement;
-                        if (dropdown) {
-                            const searchInput = dropdown.querySelector('.search-input');
-                            const hiddenInput = dropdown.querySelector('.hidden-input');
-                            const value = data[field] || (field === 'action' ? 'accept' : field === 'logtraffic' ? 'all' : field === 'logtraffic_start' || field === 'auto_asic_offload' ? 'enable' : '');
-                            searchInput.value = value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
-                            hiddenInput.value = value;
-                        }
-                    });
+                    updatePolicyList();
+                    if (policies.length > 0) {
+                        loadPolicy(policies[0].policy_id);
+                    }
 
                     input.value = templateName;
                     input.nextElementSibling.value = templateName;
                     input.nextElementSibling.nextElementSibling.classList.remove('active');
-                    sendLog(`Template '${templateName}' loaded successfully`);
+                    sendLog(`Template '${templateName}' loaded successfully with ${policies.length} policies`);
                     alert(`Template '${templateName}' loaded successfully!`);
                 } else {
                     sendLog(`Error loading template: ${result.error}`);
@@ -1214,6 +1223,10 @@
                     sendLog(`Template '${templateName}' deleted successfully`);
                     alert(result.message);
                     document.getElementById('templateName').value = '';
+                    policies = [];
+                    currentPolicyId = null;
+                    clearForm();
+                    updatePolicyList();
                     const loadTemplateInput = document.querySelector('#loadTemplate').previousElementSibling;
                     await loadTemplateOptions(loadTemplateInput);
                 } else {
@@ -1226,9 +1239,77 @@
             }
         }
 
-        function updateURL() {
+        function updatePolicyList() {
+            const policyList = document.getElementById('policyList');
+            policyList.innerHTML = '';
+            policies.forEach(policy => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    ${policy.policy_name || 'Unnamed Policy'}
+                    <button onclick="deletePolicy('${policy.policy_id}')">Delete</button>
+                `;
+                li.addEventListener('click', (e) => {
+                    if (e.target.tagName !== 'BUTTON') {
+                        loadPolicy(policy.policy_id);
+                    }
+                });
+                if (policy.policy_id === currentPolicyId) {
+                    li.classList.add('active');
+                }
+                policyList.appendChild(li);
+            });
+            sendLog(`Updated policy list with ${policies.length} policies`);
+        }
+
+        function addPolicy() {
+            const policyId = generateUUID();
+            const newPolicy = {
+                policy_id: policyId,
+                policy_name: '',
+                policy_comment: '',
+                src_interfaces: [],
+                dst_interfaces: [],
+                src_addresses: [],
+                dst_addresses: [],
+                services: [],
+                action: 'accept',
+                ssl_ssh_profile: '',
+                webfilter_profile: '',
+                application_list: '',
+                ips_sensor: '',
+                logtraffic: 'all',
+                logtraffic_start: 'enable',
+                auto_asic_offload: 'enable',
+                nat: 'disable'
+            };
+            policies.push(newPolicy);
+            currentPolicyId = policyId;
+            clearForm();
+            updatePolicyList();
+            sendLog(`Added new policy with ID: ${policyId}`);
+        }
+
+        function deletePolicy(policyId) {
+            if (!confirm('Are you sure you want to delete this policy?')) {
+                sendLog(`Deletion of policy ${policyId} cancelled`);
+                return;
+            }
+            policies = policies.filter(policy => policy.policy_id !== policyId);
+            if (currentPolicyId === policyId) {
+                currentPolicyId = policies.length > 0 ? policies[0].policy_id : null;
+                clearForm();
+                if (currentPolicyId) {
+                    loadPolicy(currentPolicyId);
+                }
+            }
+            updatePolicyList();
+            sendLog(`Deleted policy with ID: ${policyId}`);
+        }
+
+        function savePolicy() {
             const form = document.getElementById('policyForm');
             const formData = new FormData(form);
+            const policyId = document.getElementById('policyId').value || generateUUID();
             const services = [];
             document.querySelectorAll('#services > div').forEach(div => {
                 const searchInput = div.querySelector('.service-search');
@@ -1247,45 +1328,65 @@
                 }
             });
 
-            const params = new URLSearchParams();
-            formData.forEach((value, key) => {
-                if (key !== 'services') {
-                    params.append(key, value);
-                }
-            });
-            params.set('services', JSON.stringify(services));
+            const policy = {
+                policy_id: policyId,
+                policy_name: formData.get('policy_name') || '',
+                policy_comment: formData.get('policy_comment') || '',
+                src_interfaces: formData.getAll('src_interfaces[]'),
+                dst_interfaces: formData.getAll('dst_interfaces[]'),
+                src_addresses: formData.getAll('src_addresses[]'),
+                dst_addresses: formData.getAll('dst_addresses[]'),
+                services: services,
+                action: formData.get('action') || 'accept',
+                ssl_ssh_profile: formData.get('ssl_ssh_profile') || '',
+                webfilter_profile: formData.get('webfilter_profile') || '',
+                application_list: formData.get('application_list') || '',
+                ips_sensor: formData.get('ips_sensor') || '',
+                logtraffic: formData.get('logtraffic') || 'all',
+                logtraffic_start: formData.get('logtraffic_start') || 'enable',
+                auto_asic_offload: formData.get('auto_asic_offload') || 'enable',
+                nat: formData.get('nat') || 'disable'
+            };
 
-            const newURL = `${window.location.pathname}?${params.toString()}`;
-            window.history.pushState({}, '', newURL);
-            sendLog(`Updated URL with form data: ${newURL}`);
+            const index = policies.findIndex(p => p.policy_id === policyId);
+            if (index >= 0) {
+                policies[index] = policy;
+            } else {
+                policies.push(policy);
+            }
+            currentPolicyId = policyId;
+            updatePolicyList();
+            sendLog(`Saved policy with ID: ${policyId}`);
+            alert('Policy saved successfully!');
         }
 
-        function loadFromURL() {
-            const params = new URLSearchParams(window.location.search);
-            if (!params.toString()) return;
-
+        function loadPolicy(policyId) {
+            const policy = policies.find(p => p.policy_id === policyId);
+            if (!policy) {
+                sendLog(`Policy ${policyId} not found`);
+                return;
+            }
+            currentPolicyId = policyId;
             clearForm();
-            sendLog('Loading form data from URL parameters');
 
-            const policyName = params.get('policy_name') || '';
-            const policyComment = params.get('policy_comment') || '';
-            document.querySelector('input[name="policy_name"]').value = policyName;
-            document.querySelector('input[name="policy_comment"]').value = policyComment;
+            document.getElementById('policyId').value = policy.policy_id;
+            document.querySelector('input[name="policy_name"]').value = policy.policy_name;
+            document.querySelector('input[name="policy_comment"]').value = policy.policy_comment;
 
-            ['src_interfaces[]', 'dst_interfaces[]', 'src_addresses[]', 'dst_addresses[]'].forEach(field => {
-                const containerId = field === 'src_interfaces[]' ? 'srcInterfaces' :
-                                   field === 'dst_interfaces[]' ? 'dstInterfaces' :
-                                   field === 'src_addresses[]' ? 'srcAddresses' : 'dstAddresses';
+            ['srcInterfaces', 'dstInterfaces', 'srcAddresses', 'dstAddresses'].forEach(containerId => {
                 const container = document.getElementById(containerId);
                 container.innerHTML = '';
-                const values = params.getAll(field);
-                values.forEach(value => {
+                const fieldName = containerId === 'srcInterfaces' ? 'src_interfaces[]' :
+                                 containerId === 'dstInterfaces' ? 'dst_interfaces[]' :
+                                 containerId === 'srcAddresses' ? 'src_addresses[]' : 'dst_addresses[]';
+                const items = policy[fieldName.replace('[]', '')];
+                items.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'flex items-center';
                     div.innerHTML = `
                         <div class="searchable-dropdown">
-                            <input type="text" class="search-input" placeholder="Search ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}..." value="${value}" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                            <input type="hidden" name="${field}" class="hidden-input" value="${value}" required>
+                            <input type="text" class="search-input" placeholder="Search ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}..." value="${item}" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
+                            <input type="hidden" name="${fieldName}" class="hidden-input" value="${item}" required>
                             <div class="dropdown-list">
                                 <li data-value="">Select ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}</li>
                                 ${(containerId.includes('Interfaces') ? availableInterfaces : availableAddresses).map(val => `<li data-value="${val}">${val}</li>`).join('')}
@@ -1300,10 +1401,9 @@
                 });
             });
 
-            const services = JSON.parse(params.get('services') || '[]');
             const servicesContainer = document.getElementById('services');
             servicesContainer.innerHTML = '';
-            services.forEach(svc => {
+            policy.services.forEach(svc => {
                 const div = document.createElement('div');
                 div.className = 'flex items-center';
                 const value = svc.type === 'group' ? `group:${svc.name}` : svc.type === 'template' ? `service:${svc.name}` : 'custom';
@@ -1322,6 +1422,8 @@
                                 <li class="group-label">Individual Services</li>
                                 ${Object.keys(serviceTemplates).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
                                 <li data-value="custom">Custom</li>
+                                <li class="group-label">Recently Used</li>
+                                ${recentlyUsedServices.slice(0, 5).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
                             </div>
                         </div>
                         <input type="text" placeholder="Protocol" class="w-1-3 protocol" value="${protocol}" ${svc.type !== 'custom' ? 'disabled' : ''}>
@@ -1336,43 +1438,30 @@
             });
 
             ['action', 'ssl_ssh_profile', 'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat'].forEach(field => {
-                const value = params.get(field) || (field === 'action' ? 'accept' : field === 'logtraffic' ? 'all' : field === 'logtraffic_start' || field === 'auto_asic_offload' ? 'enable' : '');
-                if (value) {
-                    const dropdown = document.querySelector(`input[name="${field}"]`)?.parentElement;
-                    if (dropdown) {
-                        const searchInput = dropdown.querySelector('.search-input');
-                        searchInput.value = value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
-                        dropdown.querySelector('.hidden-input').value = value;
-                    }
+                const dropdown = document.querySelector(`input[name="${field}"]`)?.parentElement;
+                if (dropdown) {
+                    const searchInput = dropdown.querySelector('.search-input');
+                    const hiddenInput = dropdown.querySelector('.hidden-input');
+                    const value = policy[field] || (field === 'action' ? 'accept' : field === 'logtraffic' ? 'all' : field === 'logtraffic_start' || field === 'auto_asic_offload' ? 'enable' : '');
+                    searchInput.value = value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
+                    hiddenInput.value = value;
                 }
             });
 
-            sendLog('Form data loaded from URL');
+            updatePolicyList();
+            sendLog(`Loaded policy with ID: ${policyId}`);
         }
 
-        document.getElementById('policyForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            sendLog('Policy form submitted');
-            const formData = new FormData(e.target);
-            const services = [];
-            document.querySelectorAll('#services > div').forEach(div => {
-                const searchInput = div.querySelector('.service-search');
-                const hiddenInput = searchInput.nextElementSibling;
-                const protocol = div.querySelector('.protocol').value;
-                const port = div.querySelector('.port').value;
-                const value = hiddenInput.value;
-                if (value) {
-                    if (value.startsWith('group:')) {
-                        services.push({ name: value.split(':')[1], type: 'group' });
-                    } else if (value === 'custom') {
-                        services.push({ name: `${protocol}_${port}`, type: 'custom', protocol: protocol, port: port });
-                    } else {
-                        services.push({ name: value.split(':')[1], type: 'template', protocol: protocol, port: port });
-                    }
-                }
-            });
-            formData.append('services', JSON.stringify(services));
-            sendLog(`Submitting form with services: ${JSON.stringify(services)}`);
+        async function generatePolicies() {
+            if (!policies.length) {
+                sendLog('No policies to generate');
+                alert('Please add at least one policy to generate.');
+                return;
+            }
+
+            sendLog('Generating all policies');
+            const formData = new FormData();
+            formData.append('policies', JSON.stringify(policies));
 
             try {
                 const response = await fetch('/generate_policy', { method: 'POST', body: formData });
@@ -1382,17 +1471,93 @@
 
                 const outputDiv = document.getElementById('output');
                 outputDiv.classList.remove('hidden');
-                document.getElementById("out1").textContent = result.output1;
-                document.getElementById("out2").textContent = result.output2;
-                document.getElementById("out3").textContent = result.output3;
-                sendLog('Displayed all generated CLI commands');
 
+                // Clear previous outputs
+                const out1 = document.getElementById('out1');
+                const out2 = document.getElementById('out2');
+                const out3 = document.getElementById('out3');
+                out1.innerHTML = '';
+                out2.innerHTML = '';
+                out3.innerHTML = '';
+
+                // Process each policy's outputs
+                result.outputs.forEach(output => {
+                    const policyName = output.policy_name || 'Unnamed Policy';
+
+                    // Output 1: All-in-One Policy
+                    const section1 = document.createElement('div');
+                    section1.className = 'policy-section';
+                    section1.innerHTML = `
+                        <h3>Policy: ${policyName}</h3>
+                        <pre>${output.output1}</pre>
+                    `;
+                    out1.appendChild(section1);
+
+                    // Output 2: One Policy Per Service
+                    const section2 = document.createElement('div');
+                    section2.className = 'policy-section';
+                    section2.innerHTML = `
+                        <h3>Policy: ${policyName}</h3>
+                        <pre>${output.output2}</pre>
+                    `;
+                    out2.appendChild(section2);
+
+                    // Output 3: Per Src/Dst Interface and Service
+                    const section3 = document.createElement('div');
+                    section3.className = 'policy-section';
+                    section3.innerHTML = `
+                        <h3>Policy: ${policyName}</h3>
+                        <pre>${output.output3}</pre>
+                    `;
+                    out3.appendChild(section3);
+                });
+
+                sendLog('Displayed all generated CLI commands');
                 updateURL();
             } catch (e) {
-                sendLog(`Error generating policy: ${e.message}`);
-                alert('Failed to generate policy.');
+                sendLog(`Error generating policies: ${e.message}`);
+                alert('Failed to generate policies.');
             }
-        });
+        }
+
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function updateURL() {
+            const params = new URLSearchParams();
+            params.set('template_name', document.getElementById('templateName').value);
+            params.set('policies', JSON.stringify(policies));
+            const newURL = `${window.location.pathname}?${params.toString()}`;
+            window.history.pushState({}, '', newURL);
+            sendLog(`Updated URL with form data: ${newURL}`);
+        }
+
+        function loadFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            if (!params.toString()) return;
+
+            sendLog('Loading form data from URL parameters');
+            const templateName = params.get('template_name') || '';
+            const policiesParam = params.get('policies');
+            if (policiesParam) {
+                try {
+                    policies = JSON.parse(policiesParam);
+                    currentPolicyId = policies.length > 0 ? policies[0].policy_id : null;
+                    updatePolicyList();
+                    if (currentPolicyId) {
+                        loadPolicy(currentPolicyId);
+                    }
+                } catch (e) {
+                    sendLog(`Error parsing policies from URL: ${e.message}`);
+                }
+            }
+            document.getElementById('templateName').value = templateName;
+            sendLog('Form data loaded from URL');
+        }
 
         document.querySelectorAll('.searchable-dropdown').forEach(dropdown => {
             const searchInput = dropdown.querySelector('.search-input');
@@ -1403,6 +1568,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             loadFromURL();
+            addPolicy();
             sendLog('Page loaded');
         });
     </script>
