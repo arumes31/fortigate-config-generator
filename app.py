@@ -1,10 +1,13 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, redirect
 import json
 import re
 import logging
 import os
 import tempfile
 import uuid
+import string
+import random
+from urllib.parse import urlparse
 
 # Clear all existing handlers to ensure clean logging setup
 for handler in logging.root.handlers[:]:
@@ -40,6 +43,12 @@ werkzeug_logger.addHandler(stream_handler)
 
 app = Flask(__name__)
 
+# Get TRUSTED_DOMAIN from environment variable
+TRUSTED_DOMAIN = os.getenv('TRUSTED_DOMAIN')
+if not TRUSTED_DOMAIN:
+    logger.error("TRUSTED_DOMAIN environment variable not set")
+    raise ValueError("TRUSTED_DOMAIN environment variable is required")
+
 # Log all incoming requests
 @app.before_request
 def log_request_info():
@@ -73,6 +82,9 @@ SERVICE_GROUP_TEMPLATES = {
 # Template storage file (in persistent volume)
 TEMPLATE_FILE = '/app/data/templates.json'
 
+# Short URL storage file
+SHORT_URL_FILE = '/app/data/short_urls.json'
+
 # Ensure the templates.json file exists
 def ensure_template_file():
     if not os.path.exists(TEMPLATE_FILE):
@@ -80,6 +92,14 @@ def ensure_template_file():
         with open(TEMPLATE_FILE, 'w') as f:
             json.dump([], f)
         logger.debug(f"Created empty templates file at {TEMPLATE_FILE}")
+
+# Ensure the short_urls.json file exists
+def ensure_short_url_file():
+    if not os.path.exists(SHORT_URL_FILE):
+        os.makedirs(os.path.dirname(SHORT_URL_FILE), exist_ok=True)
+        with open(SHORT_URL_FILE, 'w') as f:
+            json.dump({}, f)
+        logger.debug(f"Created empty short_urls file at {SHORT_URL_FILE}")
 
 # Load existing templates or initialize empty list
 def load_templates():
@@ -91,6 +111,89 @@ def load_templates():
 def save_templates(templates):
     with open(TEMPLATE_FILE, 'w') as f:
         json.dump(templates, f, indent=4)
+
+# Load short URL mappings
+def load_short_urls():
+    ensure_short_url_file()
+    with open(SHORT_URL_FILE, 'r') as f:
+        return json.load(f)
+
+# Save short URL mappings
+def save_short_urls(short_urls):
+    with open(SHORT_URL_FILE, 'w') as f:
+        json.dump(short_urls, f, indent=4)
+
+# Generate a random short code
+def generate_short_code(length=6):
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
+
+# Validate URL domain against TRUSTED_DOMAIN
+def is_trusted_domain(url):
+    try:
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc.lower()
+        if not domain:
+            # If no netloc (e.g., relative URL), assume it's local and check path
+            return parsed_url.path.startswith('/') and not parsed_url.path.startswith('//')
+        return domain == TRUSTED_DOMAIN.lower() or domain.endswith('.' + TRUSTED_DOMAIN.lower())
+    except Exception as e:
+        logger.error(f"Error parsing URL {url}: {e}")
+        return False
+
+# Endpoint to shorten a URL
+@app.route('/shorten_url', methods=['POST'])
+def shorten_url():
+    logger.debug("Received request to shorten URL")
+    data = request.get_json()
+    if not data or 'url' not in data:
+        logger.warning("No URL provided in shorten_url request")
+        return jsonify({"error": "URL is required"}), 400
+
+    original_url = data['url']
+    
+    # Validate the URL domain
+    if not is_trusted_domain(original_url):
+        logger.warning(f"URL {original_url} does not match TRUSTED_DOMAIN {TRUSTED_DOMAIN}")
+        return jsonify({"error": f"URL must belong to trusted domain: {TRUSTED_DOMAIN}"}), 403
+
+    short_urls = load_short_urls()
+
+    # Check if URL already has a short code
+    for short_code, url in short_urls.items():
+        if url == original_url:
+            short_url = f"{request.host_url}s/{short_code}"
+            logger.debug(f"Found existing short URL: {short_url} for {original_url}")
+            return jsonify({"status": "success", "short_code": short_code})
+
+    # Generate a unique short code
+    while True:
+        short_code = generate_short_code()
+        if short_code not in short_urls:
+            break
+
+    short_urls[short_code] = original_url
+    save_short_urls(short_urls)
+    logger.debug(f"Generated short URL with code: {short_code} for {original_url}")
+    return jsonify({"status": "success", "short_code": short_code})
+
+# Endpoint to redirect short URLs
+@app.route('/s/<short_code>')
+def redirect_short_url(short_code):
+    logger.debug(f"Received request to redirect short code: {short_code}")
+    short_urls = load_short_urls()
+    original_url = short_urls.get(short_code)
+    if not original_url:
+        logger.error(f"Short code {short_code} not found")
+        return jsonify({"error": "Short URL not found"}), 404
+    
+    # Validate the stored URL domain
+    if not is_trusted_domain(original_url):
+        logger.warning(f"Stored URL {original_url} for short code {short_code} does not match TRUSTED_DOMAIN {TRUSTED_DOMAIN}")
+        return jsonify({"error": f"Redirect URL does not belong to trusted domain: {TRUSTED_DOMAIN}"}), 403
+
+    logger.debug(f"Redirecting {short_code} to {original_url}")
+    return redirect(original_url)
 
 # Endpoint to receive frontend logs
 @app.route('/log', methods=['POST'])

@@ -1,62 +1,85 @@
 [
     {
-        "name": "example",
+        "name": "test1",
         "data": {
-            "policy_name": "123123",
-            "policy_comment": "12313",
-            "src_interfaces": [
-                "internal1"
-            ],
-            "dst_interfaces": [
-                "wan1"
-            ],
-            "src_addresses": [
-                "LAN_STM"
-            ],
-            "dst_addresses": [
-                "all"
-            ],
-            "services": [
+            "policies": [
                 {
-                    "name": "HTTP",
-                    "type": "template",
-                    "protocol": "TCP",
-                    "port": "0"
+                    "policy_id": "d4540f31-a7ab-4fd2-af23-220c7f227ec1",
+                    "policy_name": "SSH",
+                    "policy_comment": "12312",
+                    "src_interfaces": [
+                        "internal1"
+                    ],
+                    "dst_interfaces": [
+                        "wan1",
+                        "wan2"
+                    ],
+                    "src_addresses": [
+                        "all"
+                    ],
+                    "dst_addresses": [
+                        "all"
+                    ],
+                    "services": [
+                        {
+                            "name": "SSH",
+                            "port": "22",
+                            "protocol": "TCP",
+                            "type": "template"
+                        }
+                    ],
+                    "action": "accept",
+                    "ssl_ssh_profile": "no-inspection",
+                    "webfilter_profile": "default",
+                    "application_list": "default",
+                    "ips_sensor": "default",
+                    "logtraffic": "all",
+                    "logtraffic_start": "enable",
+                    "auto_asic_offload": "enable",
+                    "nat": "disable"
                 },
                 {
-                    "name": "HTTPS",
-                    "type": "template",
-                    "protocol": "TCP",
-                    "port": "0"
-                },
-                {
-                    "name": "DNS",
-                    "type": "template",
-                    "protocol": "TCP",
-                    "port": "0"
-                },
-                {
-                    "name": "RDP",
-                    "type": "template",
-                    "protocol": "TCP",
-                    "port": "3389"
-                },
-                {
-                    "name": "UDP5555",
-                    "type": "template",
-                    "protocol": "TCP",
-                    "port": "0"
+                    "policy_id": "438e5b04-6e4e-423a-affe-9dccdd7b4f50",
+                    "policy_name": "HTTP/S",
+                    "policy_comment": "",
+                    "src_interfaces": [
+                        "internal1"
+                    ],
+                    "dst_interfaces": [
+                        "wan1",
+                        "wan2"
+                    ],
+                    "src_addresses": [
+                        "LAN_STM"
+                    ],
+                    "dst_addresses": [
+                        "all"
+                    ],
+                    "services": [
+                        {
+                            "name": "HTTPS",
+                            "port": "0",
+                            "protocol": "TCP",
+                            "type": "template"
+                        },
+                        {
+                            "name": "HTTP",
+                            "port": "0",
+                            "protocol": "TCP",
+                            "type": "template"
+                        }
+                    ],
+                    "action": "accept",
+                    "ssl_ssh_profile": "no-inspection",
+                    "webfilter_profile": "default",
+                    "application_list": "default",
+                    "ips_sensor": "",
+                    "logtraffic": "all",
+                    "logtraffic_start": "enable",
+                    "auto_asic_offload": "enable",
+                    "nat": "disable"
                 }
-            ],
-            "action": "accept",
-            "ssl_ssh_profile": "no-inspection",
-            "webfilter_profile": "default",
-            "application_list": "default",
-            "ips_sensor": "default",
-            "logtraffic": "all",
-            "logtraffic_start": "enable",
-            "auto_asic_offload": "enable",
-            "nat": "disable"
+            ]
         }
     }
 ]

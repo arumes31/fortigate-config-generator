@@ -136,6 +136,12 @@
         .form-container .w-1-4 {
             width: 25%;
         }
+        .form-container .w-1-6 {
+            width: 16.667%;
+        }
+        .form-container .w-1-1 {
+            width: 100%;
+        }
         .form-container button {
             margin-top: 8px;
             font-size: 14px;
@@ -1160,6 +1166,7 @@
                 if (result.status === 'success') {
                     sendLog(`Template '${templateName}' saved successfully`);
                     alert(result.message);
+                    await updateURL();
                 } else {
                     sendLog(`Error saving template: ${result.error}`);
                     alert(result.error);
@@ -1190,6 +1197,7 @@
                     input.nextElementSibling.nextElementSibling.classList.remove('active');
                     sendLog(`Template '${templateName}' loaded successfully with ${policies.length} policies`);
                     alert(`Template '${templateName}' loaded successfully!`);
+                    await updateURL();
                 } else {
                     sendLog(`Error loading template: ${result.error}`);
                     alert(result.error);
@@ -1306,7 +1314,7 @@
             sendLog(`Deleted policy with ID: ${policyId}`);
         }
 
-        function savePolicy() {
+        async function savePolicy() {
             const form = document.getElementById('policyForm');
             const formData = new FormData(form);
             const policyId = document.getElementById('policyId').value || generateUUID();
@@ -1358,6 +1366,7 @@
             updatePolicyList();
             sendLog(`Saved policy with ID: ${policyId}`);
             alert('Policy saved successfully!');
+            await updateURL();
         }
 
         function loadPolicy(policyId) {
@@ -1513,7 +1522,6 @@
                 });
 
                 sendLog('Displayed all generated CLI commands');
-                updateURL();
             } catch (e) {
                 sendLog(`Error generating policies: ${e.message}`);
                 alert('Failed to generate policies.');
@@ -1527,18 +1535,55 @@
             });
         }
 
-        function updateURL() {
+        async function updateURL() {
+            const templateName = document.getElementById('templateName').value;
+            if (!policies.length && !templateName) {
+                const newURL = window.location.origin + '/';
+                window.history.replaceState({}, '', newURL);
+                sendLog(`Updated URL to root: ${newURL}`);
+                return;
+            }
+
             const params = new URLSearchParams();
-            params.set('template_name', document.getElementById('templateName').value);
-            params.set('policies', JSON.stringify(policies));
-            const newURL = `${window.location.pathname}?${params.toString()}`;
-            window.history.pushState({}, '', newURL);
-            sendLog(`Updated URL with form data: ${newURL}`);
+            if (templateName) params.set('template_name', templateName);
+            if (policies.length) params.set('policies', JSON.stringify(policies));
+            const fullUrl = `${window.location.origin}/?${params.toString()}`;
+
+            try {
+                const response = await fetch('/shorten_url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: fullUrl })
+                });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const result = await response.json();
+                if (result.status === 'success') {
+                    const shortUrl = `/s/${result.short_code}`;
+                    window.history.replaceState({}, '', shortUrl);
+                    sendLog(`Updated URL to short URL: ${shortUrl}`);
+                } else {
+                    sendLog(`Error generating short URL: ${result.error}`);
+                    console.error(result.error);
+                }
+            } catch (e) {
+                sendLog(`Error generating short URL: ${e.message}`);
+                console.error('Failed to generate short URL:', e.message);
+            }
         }
 
         function loadFromURL() {
+            const path = window.location.pathname;
             const params = new URLSearchParams(window.location.search);
-            if (!params.toString()) return;
+
+            if (path.startsWith('/s/')) {
+                sendLog('Short URL detected, handled by server-side redirect');
+                return;
+            }
+
+            if (!params.toString()) {
+                sendLog('No URL parameters to load');
+                return;
+            }
 
             sendLog('Loading form data from URL parameters');
             const templateName = params.get('template_name') || '';
@@ -1568,9 +1613,9 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             loadFromURL();
-            addPolicy();
             sendLog('Page loaded');
         });
     </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93ebf96f8cd0bcea',t:'MTc0NzA3NDQ5MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
