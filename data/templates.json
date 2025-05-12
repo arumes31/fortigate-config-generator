@@ -1,0 +1,62 @@
+[
+    {
+        "name": "example",
+        "data": {
+            "policy_name": "123123",
+            "policy_comment": "12313",
+            "src_interfaces": [
+                "internal1"
+            ],
+            "dst_interfaces": [
+                "wan1"
+            ],
+            "src_addresses": [
+                "LAN_STM"
+            ],
+            "dst_addresses": [
+                "all"
+            ],
+            "services": [
+                {
+                    "name": "HTTP",
+                    "type": "template",
+                    "protocol": "TCP",
+                    "port": "0"
+                },
+                {
+                    "name": "HTTPS",
+                    "type": "template",
+                    "protocol": "TCP",
+                    "port": "0"
+                },
+                {
+                    "name": "DNS",
+                    "type": "template",
+                    "protocol": "TCP",
+                    "port": "0"
+                },
+                {
+                    "name": "RDP",
+                    "type": "template",
+                    "protocol": "TCP",
+                    "port": "3389"
+                },
+                {
+                    "name": "UDP5555",
+                    "type": "template",
+                    "protocol": "TCP",
+                    "port": "0"
+                }
+            ],
+            "action": "accept",
+            "ssl_ssh_profile": "no-inspection",
+            "webfilter_profile": "default",
+            "application_list": "default",
+            "ips_sensor": "default",
+            "logtraffic": "all",
+            "logtraffic_start": "enable",
+            "auto_asic_offload": "enable",
+            "nat": "disable"
+        }
+    }
+]
