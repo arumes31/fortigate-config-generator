@@ -1,0 +1,553 @@
+/* Define CSS variables for theming */
+:root {
+    --background-color: #f4f7fa; /* Soft gray background */
+    --card-background: #ffffff; /* White cards */
+    --text-color: #2d3748; /* Dark gray text */
+    --text-secondary: #4a5568; /* Lighter gray for secondary text */
+    --accent-color: #26a69a; /* Teal accent for buttons and highlights */
+    --accent-hover: #2c7a7b; /* Darker teal for hover */
+    --border-color: #e2e8f0; /* Light gray borders */
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --button-gradient-start: #26a69a;
+    --button-gradient-end: #2c7a7b;
+    --delete-button-start: #f44336;
+    --delete-button-end: #d32f2f;
+    --clone-button-start: #42a5f5; /* Blue for clone button */
+    --clone-button-end: #1e88e5; /* Darker blue for clone button hover */
+    --copy-button-start: #42a5f5;
+    --copy-button-end: #1e88e5;
+    --gradient-start: #f4f7fa;
+    --gradient-end: #e2e8f0;
+}
+
+/* Dark mode styles */
+[data-theme="dark"] {
+    --background-color: #1a202c; /* Dark background */
+    --card-background: #2d3748; /* Dark gray cards */
+    --text-color: #ffffff; /* Pure white text for better contrast */
+    --text-secondary: #a0aec0; /* Lighter gray for secondary text */
+    --border-color: #4a5568; /* Darker gray borders */
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --gradient-start: #2d3748;
+    --gradient-end: #1a202c;
+}
+
+/* Reset default margins and ensure full height */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: "Poppins", "Arial", sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    font-size: 16px; /* Base font size for better scaling */
+}
+
+/* Import Poppins font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+.container {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 300px;
+    background: linear-gradient(to bottom, var(--gradient-start), var(--gradient-end));
+    padding: 20px;
+    border-right: 1px solid var(--border-color);
+    box-shadow: 2px 0 10px var(--shadow-color);
+    box-sizing: border-box;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.sidebar h2 {
+    margin-top: 0;
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--accent-color);
+    margin-bottom: 15px;
+    line-height: 1.2;
+}
+
+#theme-toggle {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 15px;
+    background: linear-gradient(to bottom, var(--button-gradient-start), var(--button-gradient-end));
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+#theme-toggle:hover {
+    background: linear-gradient(to bottom, var(--button-gradient-end), var(--accent-hover));
+    transform: scale(1.03);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+#theme-toggle:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+}
+
+.sidebar h3 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 12px;
+    color: var(--text-color);
+}
+
+.template-section {
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.template-section select,
+.template-section input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    box-sizing: border-box;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#template-name {
+    max-width: 100%;
+}
+
+.template-section select:focus,
+.template-section input[type="text"]:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(38, 166, 154, 0.2);
+    outline: none;
+}
+
+.template-section button,
+.sidebar button:not(.clone-btn):not(.delete-btn) {
+    padding: 8px 14px;
+    margin-right: 4px;
+    margin-bottom: 8px;
+    background: linear-gradient(to bottom, var(--button-gradient-start), var(--button-gradient-end));
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.template-section button:hover,
+.sidebar button:not(.clone-btn):not(.delete-btn):hover {
+    background: linear-gradient(to bottom, var(--button-gradient-end), var(--accent-hover));
+    transform: scale(1.03);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.template-section button:focus,
+.sidebar button:not(.clone-btn):not(.delete-btn):focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+}
+
+#policy-list {
+    margin-bottom: 20px;
+}
+
+.policy-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid transparent;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    transition: background 0.2s ease, transform 0.2s ease, border-left-color 0.2s ease;
+}
+
+.policy-item:hover {
+    background-color: var(--card-background);
+    transform: translateY(-2px);
+    border-left-color: var(--accent-color);
+}
+
+.policy-item span {
+    cursor: pointer;
+    flex-grow: 1;
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.policy-item .delete-btn {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    background: linear-gradient(to bottom, var(--delete-button-start), var(--delete-button-end));
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease;
+}
+
+.policy-item .delete-btn:hover {
+    background: linear-gradient(to bottom, var(--delete-button-end), #b71c1c);
+    transform: scale(1.03);
+}
+
+.policy-item .delete-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.3);
+}
+
+.policy-item .clone-btn {
+    padding: 4px 8px;
+    margin-left: 4px;
+    font-size: 0.8rem;
+    background: linear-gradient(to bottom, var(--clone-button-start), var(--clone-button-end));
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease;
+}
+
+.policy-item .clone-btn:hover {
+    background: linear-gradient(to bottom, var(--clone-button-end), #1565c0);
+    transform: scale(1.03);
+}
+
+.policy-item .clone-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.3);
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 20px;
+    background-color: var(--background-color);
+    animation: fadeIn 0.5s ease-in;
+}
+
+.main-content h1 {
+    font-size: 2.2rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--accent-color);
+    line-height: 1.2;
+}
+
+.config-section,
+.policy-form,
+.output-section {
+    margin-bottom: 25px;
+    background-color: var(--card-background);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    transition: transform 0.2s ease;
+}
+
+.config-section:hover,
+.policy-form:hover,
+.output-section:hover {
+    transform: translateY(-3px);
+}
+
+.config-section h2,
+.policy-form h2,
+.output-section h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-color);
+}
+
+#config-file {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--background-color);
+}
+
+.config-section button {
+    padding: 8px 14px;
+    margin-right: 4px;
+    background: linear-gradient(to bottom, var(--button-gradient-start), var(--button-gradient-end));
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.config-section button:hover {
+    background: linear-gradient(to bottom, var(--button-gradient-end), var(--accent-hover));
+    transform: scale(1.03);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.config-section button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+}
+
+.policy-form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.policy-form input[type="text"],
+.policy-form select {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    box-sizing: border-box;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.policy-name,
+.policy-comment {
+    max-width: 100%;
+}
+
+.policy-form input[type="text"]:focus,
+.policy-form select:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(38, 166, 154, 0.2);
+    outline: none;
+}
+
+.policy-form button {
+    padding: 8px 14px;
+    margin-right: 4px;
+    background: linear-gradient(to bottom, var(--button-gradient-start), var(--button-gradient-end));
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.policy-form button:hover {
+    background: linear-gradient(to bottom, var(--button-gradient-end), var(--accent-hover));
+    transform: scale(1.03);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.policy-form button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+}
+
+/* Style for Generate All Policies button */
+.generate-policies-btn {
+    padding: 8px 14px;
+    margin: 10px 0;
+    background: linear-gradient(to bottom, var(--button-gradient-start), var(--button-gradient-end));
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.generate-policies-btn:hover {
+    background: linear-gradient(to bottom, var(--button-gradient-end), var(--accent-hover));
+    transform: scale(1.03);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.generate-policies-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+}
+
+/* Two-column layout */
+.form-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.form-column-left,
+.form-column-right {
+    flex: 1;
+    min-width: 0;
+}
+
+.form-column-left > div,
+.form-column-right > div {
+    margin-bottom: 8px;
+}
+
+.src-interfaces,
+.dst-interfaces,
+.src-addresses,
+.dst-addresses,
+.services {
+    margin-bottom: 5px;
+}
+
+.interface-item,
+.address-item,
+.service-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1px;
+}
+
+.interface-item select,
+.address-item select,
+.service-item select,
+.service-item input {
+    margin-right: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    transition: border-color 0.3s ease;
+}
+
+.interface-item select:focus,
+.address-item select:focus,
+.service-item select:focus,
+.service-item input:focus {
+    border-color: var(--accent-color);
+    outline: none;
+}
+
+.interface-item button,
+.address-item button,
+.service-item button {
+    padding: 4px 8px;
+    background: linear-gradient(to bottom, var(--delete-button-start), var(--delete-button-end));
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease;
+}
+
+.interface-item button:hover,
+.address-item button:hover,
+.service-item button:hover {
+    background: linear-gradient(to bottom, var(--delete-button-end), #b71c1c);
+    transform: scale(1.03);
+}
+
+.interface-item button:focus,
+.address-item button:focus,
+.service-item button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.3);
+}
+
+.output-section > div {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.output-section > div:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.output-section pre {
+    background-color: var(--background-color);
+    padding: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text-color);
+}
+
+.output-section button {
+    margin-top: 10px;
+    padding: 8px 14px;
+    background: linear-gradient(to bottom, var(--copy-button-start), var(--copy-button-end));
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.output-section button:hover {
+    background: linear-gradient(to bottom, var(--copy-button-end), #1565c0);
+    transform: scale(1.03);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.output-section button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.3);
+}
+
+/* Responsive design: stack columns on smaller screens */
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .container {
+        flex-direction: column;
+    }
+}
+
+/* Fade-in animation for sections */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

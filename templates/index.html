@@ -3,1703 +3,188 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FortiGate Policy Generator</title>
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <style>
-        html {
-            width: 100%;
-            min-height: 100vh;
-        }
-
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            min-height: 100vh;
-            width: 100%;
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        body::before {
-            content: "";
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 150vw;
-            height: 150vh;
-            transform: translate(-50%, -50%) rotate(60deg);
-            transform-origin: center center;
-            --u: 1.5vmax;
-            --c1: #ff6666;
-            --c2: #ff3333;
-            --c3: #cc0000;
-            --c4: #990000;
-            --gp: 50% / calc(var(--u) * 10) calc(var(--u) * 12);
-            --glt: repeating-conic-gradient(
-                    from 210deg at 16.66% 25%,
-                    var(--c2) 0% 33.3%,
-                    #fff0 0% 100%
-                )
-                var(--gp);
-            --glb: repeating-conic-gradient(
-                    from 210deg at 16.66% 75%,
-                    var(--c4) 0% 33.3%,
-                    #fff0 0% 100%
-                )
-                var(--gp);
-            background: repeating-linear-gradient(
-                        to bottom,
-                        var(--c1) 0% 1.5%,
-                        transparent 1.5% 23.5%,
-                        var(--c2) 23.5% 26.5%,
-                        transparent 26.5% 48.5%,
-                        var(--c3) 48.5% 51.5%,
-                        transparent 51.5% 73.5%,
-                        var(--c4) 73.5% 76.5%,
-                        transparent 76.5% 98.5%,
-                        var(--c1) 98.5% 100%
-                    )
-                    var(--gp),
-                var(--glt), var(--glb), var(--glt), var(--glb), var(--glt), var(--glb),
-                var(--glt), var(--glb),
-                repeating-conic-gradient(
-                        from 150deg at 50% 75%,
-                        var(--c1) 0% 33.3%,
-                        #fff0 0% 100%
-                    )
-                    var(--gp),
-                repeating-conic-gradient(
-                        from 90deg at 66.66% 50%,
-                        var(--c4) 0% 33.3%,
-                        #fff0 0% 100%
-                    )
-                    var(--gp),
-                repeating-conic-gradient(
-                        from -90deg at 50% 25%,
-                        var(--c1) 0% 33.3%,
-                        var(--c2) 0% 66.4%,
-                        var(--c3) 0% 100%
-                    )
-                    var(--gp);
-            z-index: -2;
-        }
-
-        body::after {
-            content: "";
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 150vw;
-            height: 150vh;
-            transform: translate(-50%, -50%) rotate(-60deg);
-            transform-origin: center center;
-            background: linear-gradient(-45deg, #330000 0%, transparent 50%, #ffcccc 100%);
-            z-index: -1;
-        }
-
-        .container {
-            width: 100%;
-            height: 100%;
-            padding: 16px;
-            display: flex;
-            flex-direction: row;
-            gap: 16px;
-            box-sizing: border-box;
-            position: relative;
-            z-index: 1;
-        }
-
-        .policy-list-container {
-            width: 20%;
-            background-color: #ffffff;
-            padding: 16px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            overflow-y: auto;
-        }
-        .policy-list-container h2 {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 16px;
-        }
-        .policy-list {
-            list-style: none;
-            padding: 0;
-        }
-        .policy-list li {
-            padding: 8px;
-            cursor: pointer;
-            border-radius: 4px;
-            margin-bottom: 4px;
-        }
-        .policy-list li:hover {
-            background-color: #f3f4f6;
-        }
-        .policy-list li.active {
-            background-color: #e5e7eb;
-            font-weight: 600;
-        }
-        .policy-list li button {
-            background-color: #dc2626;
-            color: #ffffff;
-            border: none;
-            border-radius: 4px;
-            padding: 4px 8px;
-            margin-left: 8px;
-            cursor: pointer;
-        }
-        .policy-list li button:hover {
-            background-color: #b91c1c;
-        }
-        .policy-list-container button.add-policy-btn {
-            background-color: #2563eb;
-            color: #ffffff;
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: none;
-            width: 100%;
-            margin-top: 16px;
-        }
-        .policy-list-container button.add-policy-btn:hover {
-            background-color: #1d4ed8;
-        }
-        .form-container {
-            background-color: #ffffff;
-            padding: 32px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            width: 40%;
-            height: 100%;
-            overflow-y: auto;
-        }
-        .form-container h1 {
-            font-size: 24px;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 24px;
-        }
-        .form-container label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #4b5563;
-        }
-        .form-container input[type="text"],
-        .form-container input[type="file"] {
-            display: block;
-            width: 100%;
-            margin-top: 4px;
-            padding: 8px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-            box-sizing: border-box;
-        }
-        .form-container input[type="text"]:disabled,
-        .form-container input[type="file"]:disabled {
-            background-color: #f3f4f6;
-            cursor: not-allowed;
-        }
-        .form-container .space-y-2 > * + * {
-            margin-top: 8px;
-        }
-        .form-container .flex {
-            display: flex;
-            gap: 8px;
-        }
-        .form-container .flex.items-center {
-            align-items: center;
-        }
-        .form-container .w-1-3 {
-            width: 33.333%;
-        }
-        .form-container .w-1-2 {
-            width: 50%;
-        }
-        .form-container .w-1-4 {
-            width: 25%;
-        }
-        .form-container .w-1-6 {
-            width: 16.667%;
-        }
-        .form-container .w-1-1 {
-            width: 100%;
-        }
-        .form-container button {
-            margin-top: 8px;
-            font-size: 14px;
-        }
-        .form-container button.add-btn {
-            color: #2563eb;
-        }
-        .form-container button.add-btn:hover {
-            color: #1d4ed8;
-        }
-        .form-container button.delete-btn {
-            color: #dc2626;
-        }
-        .form-container button.delete-btn:hover {
-            color: #b91c1c;
-        }
-        .form-container .mb-4 {
-            margin-bottom: 16px;
-        }
-        .form-container .gap-4 {
-            display: flex;
-            gap: 16px;
-            flex-direction: column;
-        }
-        @media (min-width: 640px) {
-            .form-container .gap-4 {
-                flex-direction: row;
-            }
-            .form-container .gap-4 button {
-                width: 50%;
-            }
-        }
-        .form-container button.submit-btn {
-            background-color: #2563eb;
-            color: #ffffff;
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: none;
-            width: 100%;
-        }
-        .form-container button.submit-btn:hover {
-            background-color: #1d4ed8;
-        }
-        .form-container button.clear-btn {
-            background-color: #dc2626;
-            color: #ffffff;
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: none;
-            width: 100%;
-        }
-        .form-container button.clear-btn:hover {
-            background-color: #b91c1c;
-        }
-        .form-container button.import-btn {
-            background-color: #16a34a;
-            color: #ffffff;
-            padding: 4px 16px;
-            border-radius: 4px;
-            border: none;
-        }
-        .form-container button.import-btn:hover {
-            background-color: #15803d;
-        }
-        .form-container button.delete-template-btn {
-            background-color: #dc2626;
-            color: #ffffff;
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: none;
-            width: 100%;
-        }
-        .form-container button.delete-template-btn:hover {
-            background-color: #b91c1c;
-        }
-        .output-container {
-            width: 40%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        @media (min-width: 1024px) {
-            .output-container {
-                flex-direction: row;
-            }
-        }
-        .output-container.hidden {
-            display: none;
-        }
-        .output-panel {
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-            background-color: #ffffff;
-            padding: 16px;
-            flex: 1;
-            overflow-y: auto;
-        }
-        .output-panel .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .output-panel h2 {
-            font-size: 18px;
-            font-weight: 600;
-        }
-        .output-panel h2.blue {
-            color: #2563eb;
-        }
-        .output-panel h2.green {
-            color: #16a34a;
-        }
-        .output-panel h2.purple {
-            color: #7c3aed;
-        }
-        .output-panel button {
-            background-color: #2563eb;
-            color: #ffffff;
-            padding: 4px 12px;
-            border-radius: 4px;
-            border: none;
-            font-size: 14px;
-        }
-        .output-panel button.blue:hover {
-            background-color: #1d4ed8;
-        }
-        .output-panel button.green {
-            background-color: #16a34a;
-        }
-        .output-panel button.green:hover {
-            background-color: #15803d;
-        }
-        .output-panel button.purple {
-            background-color: #7c3aed;
-        }
-        .output-panel button.purple:hover {
-            background-color: #6d28d9;
-        }
-        .output-panel pre {
-            background-color: #f3f4f6;
-            padding: 16px;
-            border-radius: 4px;
-            overflow: auto;
-            font-size: 14px;
-            white-space: pre-wrap;
-            margin: 0;
-        }
-        .output-panel .policy-section {
-            margin-bottom: 16px;
-        }
-        .output-panel .policy-section h3 {
-            font-size: 16px;
-            font-weight: 500;
-            margin-bottom: 8px;
-            color: #4b5563;
-        }
-        .output-panel .policy-section pre {
-            border-left: 3px solid #d1d5db;
-            padding-left: 12px;
-        }
-        .searchable-dropdown {
-            position: relative;
-            width: 100%;
-        }
-        .searchable-dropdown input[type="text"] {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-            box-sizing: border-box;
-        }
-        .searchable-dropdown .dropdown-list {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background-color: #ffffff;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 10;
-            display: none;
-        }
-        .searchable-dropdown .dropdown-list.active {
-            display: block;
-        }
-        .searchable-dropdown .dropdown-list li {
-            padding: 8px;
-            cursor: pointer;
-        }
-        .searchable-dropdown .dropdown-list li:hover {
-            background-color: #f3f4f6;
-        }
-        .searchable-dropdown .dropdown-list li.group-label {
-            font-weight: bold;
-            color: #4b5563;
-            padding: 8px;
-            cursor: default;
-        }
-    </style>
+    <title>FGT Policy Generator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/scripts.js"></script>
 </head>
 <body>
     <div class="container">
-        <!-- Policy List Section (Left) -->
-        <div class="policy-list-container">
-            <h2>Policies</h2>
-            <ul class="policy-list" id="policyList">
-                <!-- Policies will be dynamically added here -->
-            </ul>
-            <button class="add-policy-btn" onclick="addPolicy()">Add Policy</button>
+        <div class="sidebar">
+            <h2>FGT Policy Generator</h2>
+            <button id="theme-toggle" aria-label="Toggle dark mode" onclick="toggleTheme()">🌙 Dark Mode</button>
+            <div class="template-section">
+                <h3>Load Template</h3>
+                <select id="template-select">
+                    <option value="">Select Template</option>
+                </select>
+                <button onclick="loadTemplate()" aria-label="Load template">Load</button>
+                <button onclick="cloneTemplate()" aria-label="Clone template">Clone</button>
+                <button onclick="copyShortUrl()" aria-label="Copy short URL for template">Copy Short URL</button>
+                <h3>Edit Template</h3>
+                <input type="text" id="template-name" placeholder="Template Name" aria-label="Template name">
+                <button onclick="saveTemplate()" aria-label="Save template">Save</button>
+                <button onclick="deleteTemplate()" aria-label="Delete template">Delete</button>
+                <button onclick="renameTemplate()" aria-label="Rename template">Rename</button>
+            </div>
+            <h3>Policies</h3>
+            <div id="policy-list"></div>
+            <button onclick="addPolicy()" aria-label="Add new policy">Add Policy</button>
         </div>
-        <!-- Form Section (Middle) -->
-        <div class="form-container">
-            <h1>FGT Policy Generator</h1>
-            <div class="mb-4">
-                <label>Template Management</label>
-                <div class="flex gap-4">
-                    <input type="text" id="templateName" placeholder="Template Name" class="w-1-3">
-                    <button type="button" onclick="saveTemplate()" class="submit-btn w-1-6">Save Template</button>
-                    <div class="searchable-dropdown w-1-1">
-                        <input type="text" class="search-input" placeholder="Load Template..." onfocus="loadTemplateOptions(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" id="loadTemplate" class="hidden-input">
-                        <div class="dropdown-list" id="templateDropdown">
-                            <li data-value="">Select Template</li>
+        <div class="main-content">
+            <h1>Policy Configuration</h1>
+            <div class="config-section">
+                <h2>Import FortiGate Config</h2>
+                <input type="file" id="config-file" accept=".conf,.txt" aria-label="Upload config file">
+                <button onclick="importConfig()" aria-label="Import config">Import Config</button>
+            </div>
+            <div class="policy-form">
+                <h2>Policy Details</h2>
+                <div id="policy-form">
+                    <div>
+                        <label>Policy Name</label>
+                        <input type="text" class="policy-name" placeholder="Policy Name" maxlength="32" aria-label="Policy name">
+                    </div>
+                    <div>
+                        <label>Policy Comment</label>
+                        <input type="text" class="policy-comment" placeholder="Policy Comment" aria-label="Policy comment">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-column-left">
+                            <div>
+                                <label>Source Interfaces</label>
+                                <div class="src-interfaces"></div>
+                                <button onclick="addSrcInterface(this)" aria-label="Add source interface">+ Add Source Interface</button>
+                            </div>
+                            <div>
+                                <label>Source Addresses</label>
+                                <div class="src-addresses"></div>
+                                <button onclick="addSrcAddress(this)" aria-label="Add source address">+ Add Source Address</button>
+                            </div>
+                        </div>
+                        <div class="form-column-right">
+                            <div>
+                                <label>Destination Interfaces</label>
+                                <div class="dst-interfaces"></div>
+                                <button onclick="addDstInterface(this)" aria-label="Add destination interface">+ Add Destination Interface</button>
+                            </div>
+                            <div>
+                                <label>Destination Addresses</label>
+                                <div class="dst-addresses"></div>
+                                <button onclick="addDstAddress(this)" aria-label="Add destination address">+ Add Destination Address</button>
+                            </div>
                         </div>
                     </div>
-                    <button type="button" onclick="deleteTemplate()" class="delete-template-btn w-1-6">Delete Template</button>
+                    <div>
+                        <label>Services</label>
+                        <div class="services"></div>
+                        <button onclick="addService(this)" aria-label="Add service or group">+ Add Service/Group</button>
+                    </div>
+                    <div>
+                        <label>Action</label>
+                        <select class="action" aria-label="Policy action">
+                            <option value="accept">Accept</option>
+                            <option value="deny">Deny</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>SSL/SSH Profile</label>
+                        <select class="ssl-ssh-profile" aria-label="SSL/SSH profile">
+                            <option value="">None</option>
+                            {% for profile in ssl_ssh_profiles %}
+                                <option value="{{ profile }}">{{ profile }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Webfilter Profile</label>
+                        <select class="webfilter-profile" aria-label="Webfilter profile">
+                            <option value="">None</option>
+                            {% for profile in webfilter_profiles %}
+                                <option value="{{ profile }}">{{ profile }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Application List</label>
+                        <select class="application-list" aria-label="Application list">
+                            <option value="">None</option>
+                            {% for list in application_lists %}
+                                <option value="{{ list }}">{{ list }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>IPS Sensor</label>
+                        <select class="ips-sensor" aria-label="IPS sensor">
+                            <option value="">None</option>
+                            {% for sensor in ips_sensors %}
+                                <option value="{{ sensor }}">{{ sensor }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Log Traffic</label>
+                        <select class="logtraffic" aria-label="Log traffic">
+                            <option value="all">All</option>
+                            <option value="utm">UTM</option>
+                            <option value="disable">Disable</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Log Traffic Start</label>
+                        <select class="logtraffic-start" aria-label="Log traffic start">
+                            <option value="enable">Enable</option>
+                            <option value="disable">Disable</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Auto ASIC Offload</label>
+                        <select class="auto-asic-offload" aria-label="Auto ASIC offload">
+                            <option value="enable">Enable</option>
+                            <option value="disable">Disable</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>NAT</label>
+                        <select class="nat" aria-label="NAT setting">
+                            <option value="disable">Disable</option>
+                            <option value="enable">Enable</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button onclick="savePolicy(this)" aria-label="Save policy">Save Policy</button>
+                        <button onclick="clearForm(this)" aria-label="Clear form">Clear Form</button>
+                        <button onclick="clonePolicy(this)" aria-label="Clone policy">Clone Policy</button>
+                    </div>
                 </div>
             </div>
-            <div class="mb-4">
-                <label>Import FortiGate Config</label>
-                <input type="file" id="configFile" accept=".txt,.conf">
-                <button type="button" onclick="importConfig()" class="import-btn">Import Config</button>
-            </div>
-            <form id="policyForm" class="space-y-2">
-                <input type="hidden" name="policy_id" id="policyId">
-                <div>
-                    <label>Policy Name</label>
-                    <input type="text" name="policy_name" placeholder="e.g., Internet-Access" required>
-                </div>
-                <div>
-                    <label>Policy Comment</label>
-                    <input type="text" name="policy_comment" placeholder="e.g., Ticketnumber, Usage" required>
-                </div>
-                <div>
-                    <label>Source Interfaces</label>
-                    <div id="srcInterfaces" class="space-y-2">
-                        <div class="flex items-center">
-                            <div class="searchable-dropdown">
-                                <input type="text" class="search-input" placeholder="Search Interface..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                <input type="hidden" name="src_interfaces[]" class="hidden-input" required>
-                                <div class="dropdown-list">
-                                    <li data-value="">Select Interface</li>
-                                </div>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        </div>
-                    </div>
-                    <button type="button" onclick="addInterface('srcInterfaces')" class="add-btn">+ Add Source Interface</button>
-                </div>
-                <div>
-                    <label>Destination Interfaces</label>
-                    <div id="dstInterfaces" class="space-y-2">
-                        <div class="flex items-center">
-                            <div class="searchable-dropdown">
-                                <input type="text" class="search-input" placeholder="Search Interface..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                <input type="hidden" name="dst_interfaces[]" class="hidden-input" required>
-                                <div class="dropdown-list">
-                                    <li data-value="">Select Interface</li>
-                                </div>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        </div>
-                    </div>
-                    <button type="button" onclick="addInterface('dstInterfaces')" class="add-btn">+ Add Destination Interface</button>
-                </div>
-                <div>
-                    <label>Source Addresses</label>
-                    <div id="srcAddresses" class="space-y-2">
-                        <div class="flex items-center">
-                            <div class="searchable-dropdown">
-                                <input type="text" class="search-input" placeholder="Search Address..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                <input type="hidden" name="src_addresses[]" class="hidden-input" required>
-                                <div class="dropdown-list">
-                                    <li data-value="all">all</li>
-                                </div>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        </div>
-                    </div>
-                    <button type="button" onclick="addAddress('srcAddresses')" class="add-btn">+ Add Source Address</button>
-                </div>
-                <div>
-                    <label>Destination Addresses</label>
-                    <div id="dstAddresses" class="space-y-2">
-                        <div class="flex items-center">
-                            <div class="searchable-dropdown">
-                                <input type="text" class="search-input" placeholder="Search Address..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                <input type="hidden" name="dst_addresses[]" class="hidden-input" required>
-                                <div class="dropdown-list">
-                                    <li data-value="all">all</li>
-                                </div>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        </div>
-                    </div>
-                    <button type="button" onclick="addAddress('dstAddresses')" class="add-btn">+ Add Destination Address</button>
-                </div>
-                <div>
-                    <label>Services</label>
-                    <div id="services" class="space-y-2">
-                        <div class="flex items-center">
-                            <div class="flex w-full">
-                                <div class="searchable-dropdown w-2-3">
-                                    <input type="text" class="search-input service-search" placeholder="Search Service/Group..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                    <input type="hidden" class="hidden-input">
-                                    <div class="dropdown-list">
-                                        <li data-value="">Select Service/Group</li>
-                                        <li class="group-label">Service Groups</li>
-                                        {% for name in group_templates.keys() %}
-                                        <li data-value="group:{{ name }}">{{ name }}</li>
-                                        {% endfor %}
-                                        <li class="group-label">Individual Services</li>
-                                        {% for name in service_templates.keys() %}
-                                        <li data-value="service:{{ name }}">{{ name }}</li>
-                                        {% endfor %}
-                                        <li data-value="custom">Custom</li>
-                                    </div>
-                                </div>
-                                <input type="text" placeholder="Protocol" class="w-1-3 protocol" disabled>
-                                <input type="text" placeholder="Port" class="w-1-3 port" disabled>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        </div>
-                    </div>
-                    <button type="button" onclick="addService()" class="add-btn">+ Add Service/Group</button>
-                </div>
-                <div>
-                    <label>Action</label>
-                    <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search Action..." value="Accept" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="action" class="hidden-input" value="accept">
-                        <div class="dropdown-list">
-                            <li data-value="accept">Accept</li>
-                            <li data-value="deny">Deny</li>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <label>SSL/SSH Profile</label>
-                    <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search SSL/SSH Profile..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="ssl_ssh_profile" class="hidden-input">
-                        <div class="dropdown-list">
-                            <li data-value="">None</li>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <label>Webfilter Profile</label>
-                    <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search Webfilter Profile..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="webfilter_profile" class="hidden-input">
-                        <div class="dropdown-list">
-                            <li data-value="">None</li>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <label>Application List</label>
-                    <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search Application List..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="application_list" class="hidden-input">
-                        <div class="dropdown-list">
-                            <li data-value="">None</li>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <label>IPS Sensor</label>
-                    <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search IPS Sensor..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="ips_sensor" class="hidden-input">
-                        <div class="dropdown-list">
-                            <li data-value="">None</li>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <label>Log Traffic</label>
-                    <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search Log Traffic..." value="All" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="logtraffic" class="hidden-input" value="all">
-                        <div class="dropdown-list">
-                            <li data-value="all">All</li>
-                            <li data-value="utm">UTM</li>
-                            <li data-value="disable">Disable</li>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <label>Log Traffic Start</label>
-                    <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search Log Traffic Start..." value="Enable" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="logtraffic_start" class="hidden-input" value="enable">
-                        <div class="dropdown-list">
-                            <li data-value="enable">Enable</li>
-                            <li data-value="disable">Disable</li>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <label>Auto ASIC Offload</label>
-                    <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search Auto ASIC Offload..." value="Enable" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="auto_asic_offload" class="hidden-input" value="enable">
-                        <div class="dropdown-list">
-                            <li data-value="enable">Enable</li>
-                            <li data-value="disable">Disable</li>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <label>NAT</label>
-                    <div class="searchable-dropdown">
-                        <input type="text" class="search-input" placeholder="Search NAT..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" name="nat" class="hidden-input" value="disable">
-                        <div class="dropdown-list">
-                            <li data-value="disable">Disable</li>
-                            <li data-value="enable">Enable</li>
-                        </div>
-                    </div>
-                </div>
-                <div class="gap-4">
-                    <button type="button" onclick="savePolicy()" class="submit-btn">Save Policy</button>
-                    <button type="button" onclick="clearForm()" class="clear-btn">Clear Form</button>
-                </div>
-            </form>
-            <button type="button" onclick="generatePolicies()" class="submit-btn" style="margin-top: 16px;">Generate All Policies</button>
+            <button class="generate-policies-btn" onclick="generatePolicies()" aria-label="Generate all policies">Generate All Policies</button>
         </div>
-        <!-- Output Section (Right) -->
-        <div id="output" class="output-container hidden">
-            <div class="output-panel">
-                <div class="header">
-                    <h2 class="blue">Output 1: All-in-One Policies</h2>
-                    <button onclick="copyToClipboard('out1')" class="blue">Copy</button>
-                </div>
-                <div id="out1"></div>
+        <div class="output-section">
+            <div>
+                <h2>Output 1: All-in-One Policies</h2>
+                <pre id="output1"></pre>
+                <button onclick="copyOutput('output1')" aria-label="Copy Output 1">Copy</button>
             </div>
-            <div class="output-panel">
-                <div class="header">
-                    <h2 class="green">Output 2: One Policy Per Service</h2>
-                    <button onclick="copyToClipboard('out2')" class="green">Copy</button>
-                </div>
-                <div id="out2"></div>
+            <div>
+                <h2>Output 2: One Policy Per Service</h2>
+                <pre id="output2"></pre>
+                <button onclick="copyOutput('output2')" aria-label="Copy Output 2">Copy</button>
             </div>
-            <div class="output-panel">
-                <div class="header">
-                    <h2 class="purple">Output 3: Per Src/Dst Interface and Service</h2>
-                    <button onclick="copyToClipboard('out3')" class="purple">Copy</button>
-                </div>
-                <div id="out3"></div>
+            <div>
+                <h2>Output 3: Per Src/Dst Interface and Service</h2>
+                <pre id="output3"></pre>
+                <button onclick="copyOutput('output3')" aria-label="Copy Output 3">Copy</button>
             </div>
         </div>
     </div>
-    <script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function loadFileData(filename) {
-            if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-                try {
-                    var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                    var firstSheetName = workbook.SheetNames[0];
-                    var worksheet = workbook.Sheets[firstSheetName];
-                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                    var filteredData = jsonData.filter(row =>
-                        row.some(cell => cell !== '' && cell !== null && cell !== undefined)
-                    );
-                    var csv = XLSX.utils.aoa_to_sheet(filteredData);
-                    csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                    return csv;
-                } catch (e) {
-                    console.error(e);
-                    return "";
-                }
-            }
-            return gk_fileData[filename] || "";
-        }
-    </script>
     <script>
-        let availableInterfaces = [];
-        let availableAddresses = ['all'];
-        let serviceTemplates = {{ service_templates | tojson }};
-        let groupTemplates = {{ group_templates | tojson }};
-        let sslSshProfiles = [];
-        let webfilterProfiles = [];
-        let applicationLists = [];
-        let ipsSensors = [];
-        let policies = [];
-        let currentPolicyId = null;
-        let recentlyUsedServices = [];
-
-        async function sendLog(message) {
-            console.log(message);
-            try {
-                const response = await fetch('/log', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const result = await response.json();
-                if (result.status !== 'logged') {
-                    console.error('Failed to log to backend:', result);
-                }
-            } catch (e) {
-                console.error('Failed to send log to backend:', e.message);
-                console.error('Attempted log message:', message);
-            }
-        }
-
-        function showDropdown(input) {
-            const dropdown = input.nextElementSibling.nextElementSibling;
-            input.value = '';
-            dropdown.classList.add('active');
-            filterDropdown(input);
-        }
-
-        function hideDropdown(input) {
-            setTimeout(() => {
-                const dropdown = input.nextElementSibling.nextElementSibling;
-                if (!dropdown.contains(document.activeElement)) {
-                    dropdown.classList.remove('active');
-                }
-            }, 200);
-        }
-
-        function filterDropdown(input) {
-            const dropdown = input.nextElementSibling.nextElementSibling;
-            const filter = input.value.toLowerCase();
-            const items = dropdown.querySelectorAll('li:not(.group-label)');
-            let hasVisibleItems = false;
-
-            items.forEach(item => {
-                const text = item.textContent.toLowerCase();
-                if (text.includes(filter)) {
-                    item.style.display = 'block';
-                    hasVisibleItems = true;
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-
-            const groupLabels = dropdown.querySelectorAll('li.group-label');
-            groupLabels.forEach(label => {
-                const nextItems = [];
-                let nextSibling = label.nextElementSibling;
-                while (nextSibling && !nextSibling.classList.contains('group-label')) {
-                    nextItems.push(nextSibling);
-                    nextSibling = nextSibling.nextElementSibling;
-                }
-                const hasVisibleChildren = nextItems.some(item => item.style.display !== 'none');
-                label.style.display = hasVisibleChildren ? 'block' : 'none';
-            });
-
-            dropdown.classList.toggle('active', hasVisibleItems);
-        }
-
-        function selectOption(input, li) {
-            const value = li.getAttribute('data-value');
-            const text = li.textContent;
-            input.value = text;
-            const hiddenInput = input.nextElementSibling;
-            hiddenInput.value = value;
-            input.nextElementSibling.nextElementSibling.classList.remove('active');
-            sendLog(`Selected option: ${value} (${text})`);
-
-            if (input.classList.contains('service-search')) {
-                handleServiceChange(input);
-                if (value && value.startsWith('service:')) {
-                    const serviceName = value.split(':')[1];
-                    recentlyUsedServices = recentlyUsedServices.filter(name => name !== serviceName);
-                    recentlyUsedServices.unshift(serviceName);
-                    recentlyUsedServices = recentlyUsedServices.slice(0, 5);
-                    sendLog(`Updated recentlyUsedServices: ${recentlyUsedServices}`);
-                }
-            }
-        }
-
-        function deleteEntry(button) {
-            sendLog(`Deleting entry in ${button.parentElement.parentElement.id}`);
-            button.parentElement.remove();
-        }
-
-        function clearForm() {
-            const form = document.getElementById('policyForm');
-            form.reset();
-            document.getElementById('policyId').value = '';
-
-            ['srcInterfaces', 'dstInterfaces', 'srcAddresses', 'dstAddresses'].forEach(id => {
-                const container = document.getElementById(id);
-                container.innerHTML = '';
-                if (id === 'srcInterfaces') {
-                    container.innerHTML = `
-                        <div class="flex items-center">
-                            <div class="searchable-dropdown">
-                                <input type="text" class="search-input" placeholder="Search Interface..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                <input type="hidden" name="src_interfaces[]" class="hidden-input" required>
-                                <div class="dropdown-list">
-                                    <li data-value="">Select Interface</li>
-                                </div>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        </div>
-                    `;
-                } else if (id === 'dstInterfaces') {
-                    container.innerHTML = `
-                        <div class="flex items-center">
-                            <div class="searchable-dropdown">
-                                <input type="text" class="search-input" placeholder="Search Interface..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                <input type="hidden" name="dst_interfaces[]" class="hidden-input" required>
-                                <div class="dropdown-list">
-                                    <li data-value="">Select Interface</li>
-                                </div>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        </div>
-                    `;
-                } else if (id === 'srcAddresses') {
-                    container.innerHTML = `
-                        <div class="flex items-center">
-                            <div class="searchable-dropdown">
-                                <input type="text" class="search-input" placeholder="Search Address..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                <input type="hidden" name="src_addresses[]" class="hidden-input" required>
-                                <div class="dropdown-list">
-                                    <li data-value="all">all</li>
-                                </div>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        </div>
-                    `;
-                } else if (id === 'dstAddresses') {
-                    container.innerHTML = `
-                        <div class="flex items-center">
-                            <div class="searchable-dropdown">
-                                <input type="text" class="search-input" placeholder="Search Address..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                                <input type="hidden" name="dst_addresses[]" class="hidden-input" required>
-                                <div class="dropdown-list">
-                                    <li data-value="all">all</li>
-                                </div>
-                            </div>
-                            <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                        </div>
-                    `;
-                }
-            });
-
-            const servicesContainer = document.getElementById('services');
-            servicesContainer.innerHTML = '';
-            addService();
-
-            ['action', 'ssl_ssh_profile', 'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat'].forEach(field => {
-                const dropdown = document.querySelector(`input[name="${field}"]`)?.parentElement;
-                if (dropdown) {
-                    const searchInput = dropdown.querySelector('.search-input');
-                    const hiddenInput = dropdown.querySelector('.hidden-input');
-                    if (field === 'action') {
-                        searchInput.value = 'Accept';
-                        hiddenInput.value = 'accept';
-                    } else if (field === 'logtraffic') {
-                        searchInput.value = 'All';
-                        hiddenInput.value = 'all';
-                    } else if (field === 'logtraffic_start' || field === 'auto_asic_offload') {
-                        searchInput.value = 'Enable';
-                        hiddenInput.value = 'enable';
-                    } else {
-                        searchInput.value = '';
-                        hiddenInput.value = '';
-                    }
-                }
-            });
-
-            currentPolicyId = null;
-            updatePolicyList();
-        }
-
-        async function copyToClipboard(elementId) {
-            const element = document.getElementById(elementId);
-            const text = Array.from(element.querySelectorAll('pre'))
-                .map(pre => pre.textContent)
-                .join('\n\n');
-            try {
-                await navigator.clipboard.writeText(text);
-                sendLog(`Copied content of ${elementId} to clipboard`);
-                alert('Copied to clipboard!');
-            } catch (e) {
-                sendLog(`Failed to copy ${elementId} to clipboard: ${e.message}`);
-                alert('Failed to copy to clipboard.');
-            }
-        }
-
-        function addInterface(containerId) {
-            sendLog(`Adding interface to ${containerId}`);
-            const container = document.getElementById(containerId);
-            const div = document.createElement('div');
-            div.className = 'flex items-center';
-            div.innerHTML = `
-                <div class="searchable-dropdown">
-                    <input type="text" class="search-input" placeholder="Search Interface..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                    <input type="hidden" name="${containerId === 'srcInterfaces' ? 'src_interfaces[]' : 'dst_interfaces[]'}" class="hidden-input" required>
-                    <div class="dropdown-list">
-                        <li data-value="">Select Interface</li>
-                        ${availableInterfaces.map(intf => `<li data-value="${intf}">${intf}</li>`).join('')}
-                    </div>
-                </div>
-                <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-            `;
-            const searchInput = div.querySelector('.search-input');
-            searchInput.addEventListener('change', (e) => {
-                sendLog(`Selected interface in ${containerId}: ${e.target.nextElementSibling.value}`);
-            });
-            container.appendChild(div);
-
-            div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                li.addEventListener('click', () => selectOption(searchInput, li));
-            });
-        }
-
-        function addAddress(containerId) {
-            sendLog(`Adding address to ${containerId}`);
-            const container = document.getElementById(containerId);
-            const div = document.createElement('div');
-            div.className = 'flex items-center';
-            div.innerHTML = `
-                <div class="searchable-dropdown">
-                    <input type="text" class="search-input" placeholder="Search Address..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                    <input type="hidden" name="${containerId === 'srcAddresses' ? 'src_addresses[]' : 'dst_addresses[]'}" class="hidden-input" required>
-                    <div class="dropdown-list">
-                        ${availableAddresses.map(addr => `<li data-value="${addr}">${addr}</li>`).join('')}
-                    </div>
-                </div>
-                <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-            `;
-            const searchInput = div.querySelector('.search-input');
-            searchInput.value = 'all';
-            searchInput.nextElementSibling.value = 'all';
-            searchInput.addEventListener('change', (e) => {
-                sendLog(`Selected address in ${containerId}: ${e.target.nextElementSibling.value}`);
-            });
-            container.appendChild(div);
-
-            div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                li.addEventListener('click', () => selectOption(searchInput, li));
-            });
-        }
-
-        function addService() {
-            sendLog('Adding new service/group field');
-            const container = document.getElementById('services');
-            const div = document.createElement('div');
-            div.className = 'flex items-center';
-            div.innerHTML = `
-                <div class="flex w-full">
-                    <div class="searchable-dropdown w-2-3">
-                        <input type="text" class="search-input service-search" placeholder="Search Service/Group..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                        <input type="hidden" class="hidden-input">
-                        <div class="dropdown-list">
-                            <li data-value="">Select Service/Group</li>
-                            <li class="group-label">Service Groups</li>
-                            ${Object.keys(groupTemplates).map(name => `<li data-value="group:${name}">${name}</li>`).join('')}
-                            <li class="group-label">Individual Services</li>
-                            ${Object.keys(serviceTemplates).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
-                            <li data-value="custom">Custom</li>
-                            <li class="group-label">Recently Used</li>
-                            ${recentlyUsedServices.slice(0, 5).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
-                        </div>
-                    </div>
-                    <input type="text" placeholder="Protocol" class="w-1-3 protocol" disabled>
-                    <input type="text" placeholder="Port" class="w-1-3 port" disabled>
-                </div>
-                <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-            `;
-            container.appendChild(div);
-
-            div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
-            });
-        }
-
-        function handleServiceChange(input) {
-            const parent = input.parentElement.parentElement;
-            const protocolInput = parent.querySelector('.protocol');
-            const portInput = parent.querySelector('.port');
-            const selectedValue = input.nextElementSibling.value;
-
-            sendLog(`Service/Group changed to: ${selectedValue}`);
-
-            if (selectedValue === 'custom') {
-                protocolInput.disabled = false;
-                portInput.disabled = false;
-                protocolInput.value = '';
-                portInput.value = '';
-                sendLog('Enabled custom service inputs');
-            } else if (selectedValue.startsWith('service:')) {
-                const svcName = selectedValue.split(':')[1];
-                protocolInput.disabled = true;
-                portInput.disabled = true;
-                protocolInput.value = serviceTemplates[svcName]?.protocol || 'UNKNOWN';
-                portInput.value = serviceTemplates[svcName]?.port || '0';
-                sendLog(`Set service ${svcName}: protocol=${protocolInput.value}, port=${portInput.value}`);
-            } else if (selectedValue.startsWith('group:')) {
-                protocolInput.disabled = true;
-                portInput.disabled = true;
-                protocolInput.value = 'Multiple Services';
-                portInput.value = groupTemplates[selectedValue.split(':')[1]].join(', ');
-                sendLog(`Set group ${selectedValue.split(':')[1]}: ${portInput.value}`);
-            } else {
-                protocolInput.disabled = true;
-                portInput.disabled = true;
-                protocolInput.value = '';
-                portInput.value = '';
-                sendLog('Cleared service inputs');
-            }
-        }
-
-        async function importConfig() {
-            sendLog('Import config button clicked');
-            const fileInput = document.getElementById('configFile');
-            if (!fileInput.files.length) {
-                sendLog('No file selected for import');
-                alert('Please select a config file.');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('config_file', fileInput.files[0]);
-            sendLog(`Uploading config file: ${fileInput.files[0].name}`);
-
-            try {
-                const response = await fetch('/parse_config', {
-                    method: 'POST',
-                    body: formData
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const result = await response.json();
-                sendLog(`Received parse_config response: ${JSON.stringify(result)}`);
-
-                if (result.error) {
-                    sendLog(`Error parsing config: ${result.error}`);
-                    alert(result.error);
-                    return;
-                }
-
-                availableInterfaces = result.interfaces;
-                availableAddresses = ['all', ...result.addresses];
-                groupTemplates = { ...groupTemplates, ...result.service_groups };
-                sslSshProfiles = result.ssl_ssh_profiles;
-                webfilterProfiles = result.webfilter_profiles;
-                applicationLists = result.application_lists;
-                ipsSensors = result.ips_sensors;
-
-                result.services.forEach(svc => {
-                    serviceTemplates[svc.name] = { protocol: svc.protocol, port: svc.port };
-                });
-                sendLog(`Updated serviceTemplates: ${JSON.stringify(serviceTemplates)}`);
-                sendLog(`Updated groupTemplates: ${JSON.stringify(groupTemplates)}`);
-                sendLog(`Updated sslSshProfiles: ${sslSshProfiles}`);
-                sendLog(`Updated webfilterProfiles: ${webfilterProfiles}`);
-                sendLog(`Updated applicationLists: ${applicationLists}`);
-                sendLog(`Updated ipsSensors: ${ipsSensors}`);
-
-                ['srcInterfaces', 'dstInterfaces'].forEach(containerId => {
-                    const container = document.getElementById(containerId);
-                    container.innerHTML = '';
-                    const div = document.createElement('div');
-                    div.className = 'flex items-center';
-                    div.innerHTML = `
-                        <div class="searchable-dropdown">
-                            <input type="text" class="search-input" placeholder="Search Interface..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                            <input type="hidden" name="${containerId === 'srcInterfaces' ? 'src_interfaces[]' : 'dst_interfaces[]'}" class="hidden-input" required>
-                            <div class="dropdown-list">
-                                <li data-value="">Select Interface</li>
-                                ${availableInterfaces.map(intf => `<li data-value="${intf}">${intf}</li>`).join('')}
-                            </div>
-                        </div>
-                        <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                    `;
-                    const searchInput = div.querySelector('.search-input');
-                    searchInput.addEventListener('change', (e) => {
-                        sendLog(`Selected interface in ${containerId}: ${e.target.nextElementSibling.value}`);
-                    });
-                    container.appendChild(div);
-
-                    div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                        li.addEventListener('click', () => selectOption(searchInput, li));
-                    });
-                });
-
-                ['srcAddresses', 'dstAddresses'].forEach(containerId => {
-                    const container = document.getElementById(containerId);
-                    container.innerHTML = '';
-                    const div = document.createElement('div');
-                    div.className = 'flex items-center';
-                    div.innerHTML = `
-                        <div class="searchable-dropdown">
-                            <input type="text" class="search-input" placeholder="Search Address..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                            <input type="hidden" name="${containerId === 'srcAddresses' ? 'src_addresses[]' : 'dst_addresses[]'}" class="hidden-input" required>
-                            <div class="dropdown-list">
-                                ${availableAddresses.map(addr => `<li data-value="${addr}">${addr}</li>`).join('')}
-                            </div>
-                        </div>
-                        <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                    `;
-                    const searchInput = div.querySelector('.search-input');
-                    searchInput.value = 'all';
-                    searchInput.nextElementSibling.value = 'all';
-                    searchInput.addEventListener('change', (e) => {
-                        sendLog(`Selected address in ${containerId}: ${e.target.nextElementSibling.value}`);
-                    });
-                    container.appendChild(div);
-
-                    div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                        li.addEventListener('click', () => selectOption(searchInput, li));
-                    });
-                });
-
-                document.querySelectorAll('#services .searchable-dropdown').forEach(dropdown => {
-                    const list = dropdown.querySelector('.dropdown-list');
-                    list.innerHTML = `
-                        <li data-value="">Select Service/Group</li>
-                        <li class="group-label">Service Groups</li>
-                        ${Object.keys(groupTemplates).map(name => `<li data-value="group:${name}">${name}</li>`).join('')}
-                        <li class="group-label">Individual Services</li>
-                        ${Object.keys(serviceTemplates).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
-                        <li data-value="custom">Custom</li>
-                        <li class="group-label">Recently Used</li>
-                        ${recentlyUsedServices.slice(0, 5).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
-                    `;
-                    const searchInput = dropdown.querySelector('.search-input');
-                    list.querySelectorAll('li:not(.group-label)').forEach(li => {
-                        li.addEventListener('click', () => selectOption(searchInput, li));
-                    });
-                });
-
-                ['ssl_ssh_profile', 'webfilter_profile', 'application_list', 'ips_sensor'].forEach(field => {
-                    const dropdown = document.querySelector(`input[name="${field}"]`).parentElement;
-                    const list = dropdown.querySelector('.dropdown-list');
-                    const items = field === 'ssl_ssh_profile' ? sslSshProfiles :
-                                  field === 'webfilter_profile' ? webfilterProfiles :
-                                  field === 'application_list' ? applicationLists : ipsSensors;
-                    list.innerHTML = `<li data-value="">None</li>${items.map(item => `<li data-value="${item}">${item}</li>`).join('')}`;
-                    const searchInput = dropdown.querySelector('.search-input');
-                    list.querySelectorAll('li:not(.group-label)').forEach(li => {
-                        li.addEventListener('click', () => selectOption(searchInput, li));
-                    });
-                });
-
-                sendLog('Config imported successfully');
-                alert('Config imported successfully!');
-            } catch (e) {
-                sendLog(`Error during config import: ${e.message}`);
-                alert('Failed to import config.');
-            }
-        }
-
-        async function loadTemplateOptions(input) {
-            sendLog('Loading template options');
-            try {
-                const response = await fetch('/load_templates');
-                const result = await response.json();
-                const dropdown = input.nextElementSibling.nextElementSibling;
-                dropdown.innerHTML = '<li data-value="">Select Template</li>';
-                result.templates.forEach(name => {
-                    const li = document.createElement('li');
-                    li.setAttribute('data-value', name);
-                    li.textContent = name;
-                    li.addEventListener('click', () => loadTemplate(name, input));
-                    dropdown.appendChild(li);
-                });
-                dropdown.classList.add('active');
-                sendLog(`Loaded templates: ${result.templates}`);
-            } catch (e) {
-                sendLog(`Error loading templates: ${e.message}`);
-                alert('Failed to load templates.');
-            }
-        }
-
-        async function saveTemplate() {
-            const templateName = document.getElementById('templateName').value;
-            if (!templateName) {
-                sendLog('No template name provided');
-                alert('Please provide a template name.');
-                return;
-            }
-            if (!policies.length) {
-                sendLog('No policies to save');
-                alert('Please add at least one policy to save.');
-                return;
-            }
-
-            sendLog(`Saving template: ${templateName}`);
-            const formData = new FormData();
-            formData.append('template_name', templateName);
-            formData.append('policies', JSON.stringify(policies));
-
-            try {
-                const response = await fetch('/save_template', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-                if (result.status === 'success') {
-                    sendLog(`Template '${templateName}' saved successfully`);
-                    alert(result.message);
-                    await updateURL();
-                } else {
-                    sendLog(`Error saving template: ${result.error}`);
-                    alert(result.error);
-                }
-            } catch (e) {
-                sendLog(`Error saving template: ${e.message}`);
-                alert('Failed to save template.');
-            }
-        }
-
-        async function loadTemplate(templateName, input) {
-            sendLog(`Loading template: ${templateName}`);
-            try {
-                const response = await fetch(`/get_template/${encodeURIComponent(templateName)}`);
-                const result = await response.json();
-                if (result.status === 'success') {
-                    const data = result.data;
-                    policies = data.policies || [];
-                    currentPolicyId = null;
-                    clearForm();
-                    updatePolicyList();
-                    if (policies.length > 0) {
-                        loadPolicy(policies[0].policy_id);
-                    }
-
-                    input.value = templateName;
-                    input.nextElementSibling.value = templateName;
-                    input.nextElementSibling.nextElementSibling.classList.remove('active');
-                    sendLog(`Template '${templateName}' loaded successfully with ${policies.length} policies`);
-                    alert(`Template '${templateName}' loaded successfully!`);
-                    await updateURL();
-                } else {
-                    sendLog(`Error loading template: ${result.error}`);
-                    alert(result.error);
-                }
-            } catch (e) {
-                sendLog(`Error loading template: ${e.message}`);
-                alert('Failed to load template.');
-            }
-        }
-
-        async function deleteTemplate() {
-            const templateName = document.getElementById('templateName').value;
-            if (!templateName) {
-                sendLog('No template name provided for deletion');
-                alert('Please provide a template name to delete.');
-                return;
-            }
-
-            if (!confirm(`Are you sure you want to delete the template '${templateName}'? This action cannot be undone.`)) {
-                sendLog(`Deletion of template '${templateName}' cancelled by user`);
-                return;
-            }
-
-            sendLog(`Deleting template: ${templateName}`);
-            try {
-                const response = await fetch(`/delete_template/${encodeURIComponent(templateName)}`, {
-                    method: 'DELETE'
-                });
-                const result = await response.json();
-                if (result.status === 'success') {
-                    sendLog(`Template '${templateName}' deleted successfully`);
-                    alert(result.message);
-                    document.getElementById('templateName').value = '';
-                    policies = [];
-                    currentPolicyId = null;
-                    clearForm();
-                    updatePolicyList();
-                    const loadTemplateInput = document.querySelector('#loadTemplate').previousElementSibling;
-                    await loadTemplateOptions(loadTemplateInput);
-                } else {
-                    sendLog(`Error deleting template: ${result.error}`);
-                    alert(result.error);
-                }
-            } catch (e) {
-                sendLog(`Error deleting template: ${e.message}`);
-                alert('Failed to delete template.');
-            }
-        }
-
-        function updatePolicyList() {
-            const policyList = document.getElementById('policyList');
-            policyList.innerHTML = '';
-            policies.forEach(policy => {
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    ${policy.policy_name || 'Unnamed Policy'}
-                    <button onclick="deletePolicy('${policy.policy_id}')">Delete</button>
-                `;
-                li.addEventListener('click', (e) => {
-                    if (e.target.tagName !== 'BUTTON') {
-                        loadPolicy(policy.policy_id);
-                    }
-                });
-                if (policy.policy_id === currentPolicyId) {
-                    li.classList.add('active');
-                }
-                policyList.appendChild(li);
-            });
-            sendLog(`Updated policy list with ${policies.length} policies`);
-        }
-
-        function addPolicy() {
-            const policyId = generateUUID();
-            const newPolicy = {
-                policy_id: policyId,
-                policy_name: '',
-                policy_comment: '',
-                src_interfaces: [],
-                dst_interfaces: [],
-                src_addresses: [],
-                dst_addresses: [],
-                services: [],
-                action: 'accept',
-                ssl_ssh_profile: '',
-                webfilter_profile: '',
-                application_list: '',
-                ips_sensor: '',
-                logtraffic: 'all',
-                logtraffic_start: 'enable',
-                auto_asic_offload: 'enable',
-                nat: 'disable'
-            };
-            policies.push(newPolicy);
-            currentPolicyId = policyId;
-            clearForm();
-            updatePolicyList();
-            sendLog(`Added new policy with ID: ${policyId}`);
-        }
-
-        function deletePolicy(policyId) {
-            if (!confirm('Are you sure you want to delete this policy?')) {
-                sendLog(`Deletion of policy ${policyId} cancelled`);
-                return;
-            }
-            policies = policies.filter(policy => policy.policy_id !== policyId);
-            if (currentPolicyId === policyId) {
-                currentPolicyId = policies.length > 0 ? policies[0].policy_id : null;
-                clearForm();
-                if (currentPolicyId) {
-                    loadPolicy(currentPolicyId);
-                }
-            }
-            updatePolicyList();
-            sendLog(`Deleted policy with ID: ${policyId}`);
-        }
-
-        async function savePolicy() {
-            const form = document.getElementById('policyForm');
-            const formData = new FormData(form);
-            const policyId = document.getElementById('policyId').value || generateUUID();
-            const services = [];
-            document.querySelectorAll('#services > div').forEach(div => {
-                const searchInput = div.querySelector('.service-search');
-                const hiddenInput = searchInput.nextElementSibling;
-                const protocol = div.querySelector('.protocol').value;
-                const port = div.querySelector('.port').value;
-                const value = hiddenInput.value;
-                if (value) {
-                    if (value.startsWith('group:')) {
-                        services.push({ name: value.split(':')[1], type: 'group' });
-                    } else if (value === 'custom') {
-                        services.push({ name: `${protocol}_${port}`, type: 'custom', protocol, port });
-                    } else {
-                        services.push({ name: value.split(':')[1], type: 'template', protocol, port });
-                    }
-                }
-            });
-
-            const policy = {
-                policy_id: policyId,
-                policy_name: formData.get('policy_name') || '',
-                policy_comment: formData.get('policy_comment') || '',
-                src_interfaces: formData.getAll('src_interfaces[]'),
-                dst_interfaces: formData.getAll('dst_interfaces[]'),
-                src_addresses: formData.getAll('src_addresses[]'),
-                dst_addresses: formData.getAll('dst_addresses[]'),
-                services: services,
-                action: formData.get('action') || 'accept',
-                ssl_ssh_profile: formData.get('ssl_ssh_profile') || '',
-                webfilter_profile: formData.get('webfilter_profile') || '',
-                application_list: formData.get('application_list') || '',
-                ips_sensor: formData.get('ips_sensor') || '',
-                logtraffic: formData.get('logtraffic') || 'all',
-                logtraffic_start: formData.get('logtraffic_start') || 'enable',
-                auto_asic_offload: formData.get('auto_asic_offload') || 'enable',
-                nat: formData.get('nat') || 'disable'
-            };
-
-            const index = policies.findIndex(p => p.policy_id === policyId);
-            if (index >= 0) {
-                policies[index] = policy;
-            } else {
-                policies.push(policy);
-            }
-            currentPolicyId = policyId;
-            updatePolicyList();
-            sendLog(`Saved policy with ID: ${policyId}`);
-            alert('Policy saved successfully!');
-            await updateURL();
-        }
-
-        function loadPolicy(policyId) {
-            const policy = policies.find(p => p.policy_id === policyId);
-            if (!policy) {
-                sendLog(`Policy ${policyId} not found`);
-                return;
-            }
-            currentPolicyId = policyId;
-            clearForm();
-
-            document.getElementById('policyId').value = policy.policy_id;
-            document.querySelector('input[name="policy_name"]').value = policy.policy_name;
-            document.querySelector('input[name="policy_comment"]').value = policy.policy_comment;
-
-            ['srcInterfaces', 'dstInterfaces', 'srcAddresses', 'dstAddresses'].forEach(containerId => {
-                const container = document.getElementById(containerId);
-                container.innerHTML = '';
-                const fieldName = containerId === 'srcInterfaces' ? 'src_interfaces[]' :
-                                 containerId === 'dstInterfaces' ? 'dst_interfaces[]' :
-                                 containerId === 'srcAddresses' ? 'src_addresses[]' : 'dst_addresses[]';
-                const items = policy[fieldName.replace('[]', '')];
-                items.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'flex items-center';
-                    div.innerHTML = `
-                        <div class="searchable-dropdown">
-                            <input type="text" class="search-input" placeholder="Search ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}..." value="${item}" onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                            <input type="hidden" name="${fieldName}" class="hidden-input" value="${item}" required>
-                            <div class="dropdown-list">
-                                <li data-value="">Select ${containerId.includes('Interfaces') ? 'Interface' : 'Address'}</li>
-                                ${(containerId.includes('Interfaces') ? availableInterfaces : availableAddresses).map(val => `<li data-value="${val}">${val}</li>`).join('')}
-                            </div>
-                        </div>
-                        <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                    `;
-                    container.appendChild(div);
-                    div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                        li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
-                    });
-                });
-            });
-
-            const servicesContainer = document.getElementById('services');
-            servicesContainer.innerHTML = '';
-            policy.services.forEach(svc => {
-                const div = document.createElement('div');
-                div.className = 'flex items-center';
-                const value = svc.type === 'group' ? `group:${svc.name}` : svc.type === 'template' ? `service:${svc.name}` : 'custom';
-                const displayName = svc.type === 'custom' ? svc.name : svc.name;
-                const protocol = svc.protocol || '';
-                const port = svc.port || '';
-                div.innerHTML = `
-                    <div class="flex w-full">
-                        <div class="searchable-dropdown w-2-3">
-                            <input type="text" class="search-input service-search" value="${displayName}" placeholder="Search Service/Group..." onfocus="showDropdown(this)" onblur="hideDropdown(this)" oninput="filterDropdown(this)">
-                            <input type="hidden" class="hidden-input" value="${value}">
-                            <div class="dropdown-list">
-                                <li data-value="">Select Service/Group</li>
-                                <li class="group-label">Service Groups</li>
-                                ${Object.keys(groupTemplates).map(name => `<li data-value="group:${name}">${name}</li>`).join('')}
-                                <li class="group-label">Individual Services</li>
-                                ${Object.keys(serviceTemplates).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
-                                <li data-value="custom">Custom</li>
-                                <li class="group-label">Recently Used</li>
-                                ${recentlyUsedServices.slice(0, 5).map(name => `<li data-value="service:${name}">${name}</li>`).join('')}
-                            </div>
-                        </div>
-                        <input type="text" placeholder="Protocol" class="w-1-3 protocol" value="${protocol}" ${svc.type !== 'custom' ? 'disabled' : ''}>
-                        <input type="text" placeholder="Port" class="w-1-3 port" value="${port}" ${svc.type !== 'custom' ? 'disabled' : ''}>
-                    </div>
-                    <button type="button" onclick="deleteEntry(this)" class="delete-btn">Delete</button>
-                `;
-                servicesContainer.appendChild(div);
-                div.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                    li.addEventListener('click', () => selectOption(div.querySelector('.search-input'), li));
-                });
-            });
-
-            ['action', 'ssl_ssh_profile', 'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat'].forEach(field => {
-                const dropdown = document.querySelector(`input[name="${field}"]`)?.parentElement;
-                if (dropdown) {
-                    const searchInput = dropdown.querySelector('.search-input');
-                    const hiddenInput = dropdown.querySelector('.hidden-input');
-                    const value = policy[field] || (field === 'action' ? 'accept' : field === 'logtraffic' ? 'all' : field === 'logtraffic_start' || field === 'auto_asic_offload' ? 'enable' : '');
-                    searchInput.value = value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
-                    hiddenInput.value = value;
-                }
-            });
-
-            updatePolicyList();
-            sendLog(`Loaded policy with ID: ${policyId}`);
-        }
-
-        async function generatePolicies() {
-            if (!policies.length) {
-                sendLog('No policies to generate');
-                alert('Please add at least one policy to generate.');
-                return;
-            }
-
-            sendLog('Generating all policies');
-            const formData = new FormData();
-            formData.append('policies', JSON.stringify(policies));
-
-            try {
-                const response = await fetch('/generate_policy', { method: 'POST', body: formData });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const result = await response.json();
-                sendLog(`Received generate_policy response: ${JSON.stringify(result)}`);
-
-                const outputDiv = document.getElementById('output');
-                outputDiv.classList.remove('hidden');
-
-                // Clear previous outputs
-                const out1 = document.getElementById('out1');
-                const out2 = document.getElementById('out2');
-                const out3 = document.getElementById('out3');
-                out1.innerHTML = '';
-                out2.innerHTML = '';
-                out3.innerHTML = '';
-
-                // Process each policy's outputs
-                result.outputs.forEach(output => {
-                    const policyName = output.policy_name || 'Unnamed Policy';
-
-                    // Output 1: All-in-One Policy
-                    const section1 = document.createElement('div');
-                    section1.className = 'policy-section';
-                    section1.innerHTML = `
-                        <h3>Policy: ${policyName}</h3>
-                        <pre>${output.output1}</pre>
-                    `;
-                    out1.appendChild(section1);
-
-                    // Output 2: One Policy Per Service
-                    const section2 = document.createElement('div');
-                    section2.className = 'policy-section';
-                    section2.innerHTML = `
-                        <h3>Policy: ${policyName}</h3>
-                        <pre>${output.output2}</pre>
-                    `;
-                    out2.appendChild(section2);
-
-                    // Output 3: Per Src/Dst Interface and Service
-                    const section3 = document.createElement('div');
-                    section3.className = 'policy-section';
-                    section3.innerHTML = `
-                        <h3>Policy: ${policyName}</h3>
-                        <pre>${output.output3}</pre>
-                    `;
-                    out3.appendChild(section3);
-                });
-
-                sendLog('Displayed all generated CLI commands');
-            } catch (e) {
-                sendLog(`Error generating policies: ${e.message}`);
-                alert('Failed to generate policies.');
-            }
-        }
-
-        function generateUUID() {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        }
-
-        async function updateURL() {
-            const templateName = document.getElementById('templateName').value;
-            if (!policies.length && !templateName) {
-                const newURL = window.location.origin + '/';
-                window.history.replaceState({}, '', newURL);
-                sendLog(`Updated URL to root: ${newURL}`);
-                return;
-            }
-
-            const params = new URLSearchParams();
-            if (templateName) params.set('template_name', templateName);
-            if (policies.length) params.set('policies', JSON.stringify(policies));
-            const fullUrl = `${window.location.origin}/?${params.toString()}`;
-
-            try {
-                const response = await fetch('/shorten_url', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: fullUrl })
-                });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const result = await response.json();
-                if (result.status === 'success') {
-                    const shortUrl = `/s/${result.short_code}`;
-                    window.history.replaceState({}, '', shortUrl);
-                    sendLog(`Updated URL to short URL: ${shortUrl}`);
-                } else {
-                    sendLog(`Error generating short URL: ${result.error}`);
-                    console.error(result.error);
-                }
-            } catch (e) {
-                sendLog(`Error generating short URL: ${e.message}`);
-                console.error('Failed to generate short URL:', e.message);
-            }
-        }
-
-        function loadFromURL() {
-            const path = window.location.pathname;
-            const params = new URLSearchParams(window.location.search);
-
-            if (path.startsWith('/s/')) {
-                sendLog('Short URL detected, handled by server-side redirect');
-                return;
-            }
-
-            if (!params.toString()) {
-                sendLog('No URL parameters to load');
-                return;
-            }
-
-            sendLog('Loading form data from URL parameters');
-            const templateName = params.get('template_name') || '';
-            const policiesParam = params.get('policies');
-            if (policiesParam) {
-                try {
-                    policies = JSON.parse(policiesParam);
-                    currentPolicyId = policies.length > 0 ? policies[0].policy_id : null;
-                    updatePolicyList();
-                    if (currentPolicyId) {
-                        loadPolicy(currentPolicyId);
-                    }
-                } catch (e) {
-                    sendLog(`Error parsing policies from URL: ${e.message}`);
-                }
-            }
-            document.getElementById('templateName').value = templateName;
-            sendLog('Form data loaded from URL');
-        }
-
-        document.querySelectorAll('.searchable-dropdown').forEach(dropdown => {
-            const searchInput = dropdown.querySelector('.search-input');
-            dropdown.querySelectorAll('.dropdown-list li:not(.group-label)').forEach(li => {
-                li.addEventListener('click', () => selectOption(searchInput, li));
-            });
-        });
-
-        document.addEventListener('DOMContentLoaded', () => {
-            loadFromURL();
-            sendLog('Page loaded');
-        });
+        // Pass preselected template from server to JavaScript
+        {% if preselected_template %}
+            window.preselectedTemplate = "{{ preselected_template }}";
+        {% else %}
+            window.preselectedTemplate = null;
+        {% endif %}
     </script>
 </body>
 </html>
