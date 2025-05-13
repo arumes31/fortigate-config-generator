@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, jsonify, redirect
+from flask import Flask, request, render_template, jsonify, redirect, send_file
 import json
 import re
 import logging
@@ -9,6 +9,7 @@ import string
 import random
 from urllib.parse import urlparse
 import sqlite3
+from io import BytesIO
 
 # Configure logging
 for handler in logging.root.handlers[:]:
@@ -118,7 +119,20 @@ KNOWN_SERVICES = {
     "IMAP": {"protocol": "TCP", "port": "143"},
     "IMAPS": {"protocol": "TCP", "port": "993"},
     "NTP": {"protocol": "UDP", "port": "123"},
-    "HTTPS_QUIC": {"protocol": "UDP", "port": "443"}
+    "HTTPS_QUIC": {"protocol": "UDP", "port": "443"},
+    "TCP9443": {"protocol": "TCP", "port": "9443"},
+    "TCP9422": {"protocol": "TCP", "port": "9422"},
+    "UDP1194": {"protocol": "UDP", "port": "1194"},
+    "UDP1198": {"protocol": "UDP", "port": "1198"},
+    "UDP5555": {"protocol": "UDP", "port": "5555"},
+    "TCP10011_TS3_DR": {"protocol": "TCP", "port": "10011"},
+    "TCP30033_TS3_DR": {"protocol": "TCP", "port": "30033"},
+    "TCP9987_TS3_DR": {"protocol": "TCP", "port": "9987"},
+    "UDP10011_TS3_DR": {"protocol": "UDP", "port": "10011"},
+    "UDP30033_TS3_DR": {"protocol": "UDP", "port": "30033"},
+    "UDP9987_TS3_DR": {"protocol": "UDP", "port": "9987"},
+    "TCP28967_STORJ3": {"protocol": "TCP", "port": "28967"},
+    "UDP28967_STORJ3": {"protocol": "UDP", "port": "28967"}
 }
 
 # Load templates from SQLite
@@ -361,6 +375,69 @@ def save_template():
     except Exception as e:
         logger.error(f"Failed to save template '{template_name}': {str(e)}")
         return jsonify({"error": "Failed to save template"}), 500
+
+@app.route('/import_template', methods=['POST'])
+def import_template():
+    logger.debug("Received request to import template")
+    template_name = request.form.get('template_name')
+    template_data_str = request.form.get('template_data')
+
+    if not template_name:
+        logger.error("Template name not provided")
+        return jsonify({"error": "Template name is required"}), 400
+    if not template_data_str:
+        logger.error("Template data not provided")
+        return jsonify({"error": "Template data is required"}), 400
+
+    try:
+        template_data = json.loads(template_data_str)
+        if not isinstance(template_data, dict) or 'policies' not in template_data:
+            logger.error("Invalid template data format")
+            return jsonify({"error": "Invalid template data format: Must contain policies"}), 400
+
+        # Validate template data structure
+        required_policy_fields = ['policy_id', 'policy_name', 'policy_comment', 'src_interfaces', 'dst_interfaces',
+                                  'src_addresses', 'dst_addresses', 'services', 'action', 'ssl_ssh_profile',
+                                  'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic',
+                                  'logtraffic_start', 'auto_asic_offload', 'nat']
+        for policy in template_data['policies']:
+            for field in required_policy_fields:
+                if field not in policy:
+                    policy[field] = '' if isinstance(policy.get(field, ''), str) else []
+            # Ensure policy_id is unique
+            policy['policy_id'] = str(uuid.uuid4())
+
+        save_template_to_db(template_name, template_data)
+        return jsonify({"status": "success", "message": f"Template '{template_name}' imported"})
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse template data: {str(e)}")
+        return jsonify({"error": "Invalid JSON format"}), 400
+    except Exception as e:
+        logger.error(f"Failed to import template '{template_name}': {str(e)}")
+        return jsonify({"error": "Failed to import template"}), 500
+
+@app.route('/export_template/<template_name>', methods=['GET'])
+def export_template(template_name):
+    logger.debug(f"Received request to export template: {template_name}")
+    templates = load_templates()
+    for template in templates:
+        if template['name'] == template_name:
+            export_data = {
+                'name': template_name,
+                'data': template['data']
+            }
+            buffer = BytesIO()
+            buffer.write(json.dumps(export_data, indent=2).encode('utf-8'))
+            buffer.seek(0)
+            logger.debug(f"Template '{template_name}' exported as JSON")
+            return send_file(
+                buffer,
+                as_attachment=True,
+                download_name=f"{template_name}.json",
+                mimetype='application/json'
+            )
+    logger.error(f"Template '{template_name}' not found for export")
+    return jsonify({"error": "Template not found"}), 404
 
 @app.route('/load_templates', methods=['GET'])
 def load_templates_endpoint():

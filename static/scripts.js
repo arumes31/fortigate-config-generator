@@ -834,17 +834,17 @@ function renameTemplate() {
     });
 }
 
-function copyShortUrl() {
+function copyUrl() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
-        console.error('No template selected for copying short URL');
-        alert('Please select a template to copy its short URL');
+        console.error('No template selected for copying URL');
+        alert('Please select a template to copy its URL');
         return;
     }
 
     // Construct the relative template URL
     const templateUrl = `/get_template/${templateName}`;
-    console.log(`Generating short URL for: ${templateUrl}`);
+    console.log(`Generating URL for: ${templateUrl}`);
 
     // Call the /shorten_url endpoint
     fetch('/shorten_url', {
@@ -857,34 +857,124 @@ function copyShortUrl() {
         if (data.status === 'success') {
             const shortCode = data.short_code;
             const shortUrl = `${window.location.origin}/s/${shortCode}`;
-            console.log(`Short URL generated: ${shortUrl}`);
+            console.log(`URL generated: ${shortUrl}`);
 
-            // Copy the short URL to the clipboard
+            // Copy the URL to the clipboard
             navigator.clipboard.writeText(shortUrl)
                 .then(() => {
-                    console.log(`Successfully copied short URL: ${shortUrl}`);
-                    alert('Short URL copied to clipboard');
+                    console.log(`Successfully copied URL: ${shortUrl}`);
+                    alert('URL copied to clipboard');
                 })
                 .catch(error => {
-                    console.error('Error copying short URL:', error.message);
+                    console.error('Error copying URL:', error.message);
                     if (error.message.includes('secure context')) {
                         console.error('Clipboard API requires a secure context (HTTPS or localhost). Ensure the page is served over HTTPS.');
-                        alert('Error copying short URL: This feature requires a secure context (HTTPS or localhost).');
+                        alert('Error copying URL: This feature requires a secure context (HTTPS or localhost).');
                     } else if (error.message.includes('permission')) {
                         console.error('Clipboard access denied. Check browser permissions for clipboard access.');
-                        alert('Error copying short URL: Clipboard access denied. Please allow clipboard permissions in your browser.');
+                        alert('Error copying URL: Clipboard access denied. Please allow clipboard permissions in your browser.');
                     } else {
-                        alert('Error copying short URL: ' + error.message);
+                        alert('Error copying URL: ' + error.message);
                     }
                 });
         } else {
-            console.error('Error generating short URL:', data.error);
-            alert('Error generating short URL: ' + data.error);
+            console.error('Error generating URL:', data.error);
+            alert('Error generating URL: ' + data.error);
         }
     })
     .catch(error => {
-        console.error('Error generating short URL:', error);
-        alert('Error generating short URL');
+        console.error('Error generating URL:', error);
+        alert('Error generating URL');
+    });
+}
+
+function importTemplate(event) {
+    const fileInput = event.target;
+    if (!fileInput?.files.length) {
+        console.error('No template file selected');
+        alert('Please select a JSON file to import');
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        try {
+            const templateData = JSON.parse(e.target.result);
+            if (!templateData.name || !templateData.data || !templateData.data.policies) {
+                throw new Error('Invalid template format: Must contain name and data with policies');
+            }
+
+            const formData = new FormData();
+            formData.append('template_name', templateData.name);
+            formData.append('template_data', JSON.stringify(templateData.data));
+
+            fetch('/import_template', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(`Template '${templateData.name}' imported successfully`);
+                    loadTemplateList();
+                    // Reset the file input
+                    fileInput.value = '';
+                } else {
+                    console.error('Error importing template:', data.error);
+                    alert('Error importing template: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error importing template:', error);
+                alert('Error importing template');
+            });
+        } catch (error) {
+            console.error('Error parsing template file:', error);
+            alert('Error parsing template file: ' + error.message);
+        }
+    };
+
+    reader.onerror = function() {
+        console.error('Error reading template file');
+        alert('Error reading template file');
+    };
+
+    reader.readAsText(file);
+}
+
+function exportTemplate() {
+    const templateName = document.getElementById('template-select')?.value;
+    if (!templateName) {
+        console.error('No template selected for export');
+        alert('Please select a template to export');
+        return;
+    }
+
+    fetch(`/export_template/${templateName}`)
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Failed to export template');
+            });
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${templateName}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        alert(`Template '${templateName}' exported successfully`);
+    })
+    .catch(error => {
+        console.error('Error exporting template:', error);
+        alert('Error exporting template: ' + error.message);
     });
 }
 

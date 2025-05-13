@@ -19,12 +19,15 @@
                 </select>
                 <button onclick="loadTemplate()" aria-label="Load template">Load</button>
                 <button onclick="cloneTemplate()" aria-label="Clone template">Clone</button>
-                <button onclick="copyShortUrl()" aria-label="Copy short URL for template">Copy Short URL</button>
+                <button onclick="copyUrl()" aria-label="Copy URL for template">Copy URL</button>
                 <h3>Edit Template</h3>
                 <input type="text" id="template-name" placeholder="Template Name" aria-label="Template name">
                 <button onclick="saveTemplate()" aria-label="Save template">Save</button>
                 <button onclick="deleteTemplate()" aria-label="Delete template">Delete</button>
                 <button onclick="renameTemplate()" aria-label="Rename template">Rename</button>
+                <input type="file" id="template-file" accept=".json" style="display: none;" aria-label="Upload template file">
+                <button onclick="document.getElementById('template-file').click()" aria-label="Import template">Import Template</button>
+                <button onclick="exportTemplate()" aria-label="Export template">Export Template</button>
             </div>
             <h3>Policies</h3>
             <div id="policy-list"></div>
@@ -185,6 +188,8 @@
         {% else %}
             window.preselectedTemplate = null;
         {% endif %}
+        // Handle template file input change
+        document.getElementById('template-file').addEventListener('change', importTemplate);
     </script>
 </body>
 </html>
