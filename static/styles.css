@@ -1,3 +1,4 @@
+/* styles.css (Version 1.5) */
 /* Define CSS variables for theming */
 :root {
     --background-color: #f4f7fa; /* Soft gray background */
@@ -18,6 +19,8 @@
     --copy-button-end: #1e88e5;
     --gradient-start: #f4f7fa;
     --gradient-end: #e2e8f0;
+    --success-color: #4caf50; /* Green for success notifications */
+    --error-color: #f44336; /* Red for error notifications */
 }
 
 /* Dark mode styles */
@@ -30,6 +33,8 @@
     --shadow-color: rgba(0, 0, 0, 0.3);
     --gradient-start: #2d3748;
     --gradient-end: #1a202c;
+    --success-color: #66bb6a; /* Lighter green for dark mode */
+    --error-color: #ef5350; /* Lighter red for dark mode */
 }
 
 /* Reset default margins and ensure full height */
@@ -45,6 +50,51 @@ html, body {
 
 /* Import Poppins font */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+/* Notification container */
+#notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    width: 300px;
+    max-width: 90%;
+}
+
+/* Individual notification */
+.notification {
+    background-color: var(--card-background);
+    color: var(--text-color);
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    animation: flyIn 0.5s ease-out forwards;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.notification.success {
+    border-left: 4px solid var(--success-color);
+}
+
+.notification.error {
+    border-left: 4px solid var(--error-color);
+}
+
+/* Fly-in animation for notifications */
+@keyframes flyIn {
+    0% {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
 
 .container {
     display: flex;
@@ -365,6 +415,10 @@ html, body {
     box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
 }
 
+.policy-form button[type="button"][onclick^="add"] {
+    margin-bottom: 15px;
+}
+
 /* Style for Generate All Policies button */
 .generate-policies-btn {
     padding: 8px 14px;
@@ -409,17 +463,42 @@ html, body {
     margin-bottom: 8px;
 }
 
+.form-column-left label,
+.form-column-right label {
+    margin-bottom: 5px;
+}
+
+.form-column-left input,
+.form-column-right input {
+    margin-bottom: 0;
+}
+
 .src-interfaces,
 .dst-interfaces,
 .src-addresses,
 .dst-addresses,
-.services {
+.services,
+.src-users-groups {
     margin-bottom: 5px;
+}
+
+.src-interfaces label,
+.dst-interfaces label,
+.src-addresses label,
+.dst-addresses label,
+.services label,
+.src-users-groups label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-color);
 }
 
 .interface-item,
 .address-item,
-.service-item {
+.service-item,
+.user-group-item {
     display: flex;
     align-items: center;
     margin-bottom: 1px;
@@ -428,7 +507,8 @@ html, body {
 .interface-item select,
 .address-item select,
 .service-item select,
-.service-item input {
+.service-item input,
+.user-group-item select {
     margin-right: 6px;
     padding: 8px 12px;
     border: 1px solid var(--border-color);
@@ -442,14 +522,16 @@ html, body {
 .interface-item select:focus,
 .address-item select:focus,
 .service-item select:focus,
-.service-item input:focus {
+.service-item input:focus,
+.user-group-item select:focus {
     border-color: var(--accent-color);
     outline: none;
 }
 
 .interface-item button,
 .address-item button,
-.service-item button {
+.service-item button,
+.user-group-item button {
     padding: 4px 8px;
     background: linear-gradient(to bottom, var(--delete-button-start), var(--delete-button-end));
     color: white;
@@ -462,14 +544,16 @@ html, body {
 
 .interface-item button:hover,
 .address-item button:hover,
-.service-item button:hover {
+.service-item button:hover,
+.user-group-item button:hover {
     background: linear-gradient(to bottom, var(--delete-button-end), #b71c1c);
     transform: scale(1.03);
 }
 
 .interface-item button:focus,
 .address-item button:focus,
-.service-item button:focus {
+.service-item button:focus,
+.user-group-item button:focus {
     outline: none;
     box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.3);
 }

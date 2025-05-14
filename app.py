@@ -1,3 +1,4 @@
+# app.py (Version 1.1)
 from flask import Flask, request, render_template, jsonify, redirect, send_file
 import json
 import re
@@ -290,6 +291,8 @@ def index(preselected_template=None):
     addresses = []
     services = []
     service_groups = {}
+    users = []
+    groups = []
     
     # Load profiles from the last parsed config (if available)
     try:
@@ -303,6 +306,8 @@ def index(preselected_template=None):
             addresses = config.get('addresses', [])
             services = config.get('services', [])
             service_groups = config.get('service_groups', {})
+            users = config.get('users', [])
+            groups = config.get('groups', [])
     except FileNotFoundError:
         logger.debug("No previous config found")
     
@@ -318,6 +323,8 @@ def index(preselected_template=None):
         addresses=addresses,
         services=services,
         service_groups=service_groups,
+        users=users,
+        groups=groups,
         preselected_template=preselected_template
     )
 
@@ -365,7 +372,9 @@ def save_template():
             'logtraffic': policy.get('logtraffic', ''),
             'logtraffic_start': policy.get('logtraffic_start', ''),
             'auto_asic_offload': policy.get('auto_asic_offload', ''),
-            'nat': policy.get('nat', '')
+            'nat': policy.get('nat', ''),
+            'users': policy.get('users', []),
+            'groups': policy.get('groups', [])
         }
         template_data['policies'].append(policy_data)
 
@@ -399,11 +408,13 @@ def import_template():
         required_policy_fields = ['policy_id', 'policy_name', 'policy_comment', 'src_interfaces', 'dst_interfaces',
                                   'src_addresses', 'dst_addresses', 'services', 'action', 'ssl_ssh_profile',
                                   'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic',
-                                  'logtraffic_start', 'auto_asic_offload', 'nat']
+                                  'logtraffic_start', 'auto_asic_offload', 'nat', 'users', 'groups']
         for policy in template_data['policies']:
             for field in required_policy_fields:
                 if field not in policy:
-                    policy[field] = '' if isinstance(policy.get(field, ''), str) else []
+                    policy[field] = '' if field in ['policy_name', 'policy_comment', 'action', 'ssl_ssh_profile',
+                                                   'webfilter_profile', 'application_list', 'ips_sensor',
+                                                   'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat'] else []
             # Ensure policy_id is unique
             policy['policy_id'] = str(uuid.uuid4())
 
@@ -462,6 +473,8 @@ def get_template(template_name):
             webfilter_profiles = set()
             application_lists = set()
             ips_sensors = set()
+            users = set()
+            groups = set()
 
             for policy in template['data']['policies']:
                 interfaces.update(policy.get('src_interfaces', []))
@@ -491,6 +504,8 @@ def get_template(template_name):
                     application_lists.add(policy['application_list'])
                 if policy.get('ips_sensor'):
                     ips_sensors.add(policy['ips_sensor'])
+                users.update(policy.get('users', []))
+                groups.update(policy.get('groups', []))
 
             logger.debug(f"Template '{template_name}' found")
             return jsonify({
@@ -504,7 +519,9 @@ def get_template(template_name):
                     "ssl_ssh_profiles": list(ssl_ssh_profiles),
                     "webfilter_profiles": list(webfilter_profiles),
                     "application_lists": list(application_lists),
-                    "ips_sensors": list(ips_sensors)
+                    "ips_sensors": list(ips_sensors),
+                    "users": list(users),
+                    "groups": list(groups)
                 }
             })
     logger.error(f"Template '{template_name}' not found")
@@ -566,7 +583,7 @@ def rename_template():
 
     # Remove the old template
     templates = [t for t in templates if t['name'] != old_name]
-    # Add the template with the new name
+    # Add the izan template with the new name
     template_to_rename['name'] = new_name
     templates.append(template_to_rename)
 
@@ -633,7 +650,7 @@ def generate_policy():
         logger.error("No policies provided")
         return jsonify({"error": "At least one policy is required"}), 400
 
-    def generate_single_policy(policy_name, policy_comment, src_intfs, dst_intfs, src_addrs, dst_addrs, svc_names, action, ssl_ssh_profile, webfilter_profile, application_list, ips_sensor, logtraffic, logtraffic_start, auto_asic_offload, nat, services, include_custom_services=True):
+    def generate_single_policy(policy_name, policy_comment, src_intfs, dst_intfs, src_addrs, dst_addrs, svc_names, action, ssl_ssh_profile, webfilter_profile, application_list, ips_sensor, logtraffic, logtraffic_start, auto_asic_offload, nat, services, users, groups, include_custom_services=True):
         if not src_intfs or not dst_intfs or not src_addrs or not dst_addrs or not svc_names:
             logger.warning(f"Skipping policy generation for {policy_name} due to missing required fields")
             return ""
@@ -651,6 +668,11 @@ def generate_policy():
         cli_commands += "set dstintf " + " ".join([f'"{intf}"' for intf in dst_intfs if intf]) + "\n"
         cli_commands += "set srcaddr " + " ".join([f'"{addr}"' for addr in src_addrs if addr]) + "\n"
         cli_commands += "set dstaddr " + " ".join([f'"{addr}"' for addr in dst_addrs if addr]) + "\n"
+
+        if users:
+            cli_commands += "set users " + " ".join([f'"{user}"' for user in users if user]) + "\n"
+        if groups:
+            cli_commands += "set groups " + " ".join([f'"{group}"' for group in groups if group]) + "\n"
 
         if include_custom_services:
             for svc in services:
@@ -699,6 +721,8 @@ def generate_policy():
         logtraffic_start = policy.get('logtraffic_start', 'enable')
         auto_asic_offload = policy.get('auto_asic_offload', 'enable')
         nat = policy.get('nat', 'enable')
+        users = policy.get('users', [])
+        groups = policy.get('groups', [])
 
         logger.debug(f"Generating policy: {policy_name}")
         logger.debug(f"Policy Comment: {policy_comment}")
@@ -716,6 +740,8 @@ def generate_policy():
         logger.debug(f"Log Traffic Start: {logtraffic_start}")
         logger.debug(f"Auto ASIC Offload: {auto_asic_offload}")
         logger.debug(f"NAT: {nat}")
+        logger.debug(f"Users: {users}")
+        logger.debug(f"Groups: {groups}")
 
         service_names = []
         for svc in services:
@@ -745,7 +771,9 @@ def generate_policy():
             logtraffic_start=logtraffic_start,
             auto_asic_offload=auto_asic_offload,
             nat=nat,
-            services=services
+            services=services,
+            users=users,
+            groups=groups
         )
         logger.debug("Output 1 (All in one policy):\n%s", output1)
 
@@ -771,7 +799,9 @@ def generate_policy():
                     logtraffic_start=logtraffic_start,
                     auto_asic_offload=auto_asic_offload,
                     nat=nat,
-                    services=services
+                    services=services,
+                    users=users,
+                    groups=groups
                 )
                 output2 += "\n" if output2 else ""
         else:
@@ -808,7 +838,9 @@ def generate_policy():
                             logtraffic_start=logtraffic_start,
                             auto_asic_offload=auto_asic_offload,
                             nat=nat,
-                            services=services
+                            services=services,
+                            users=users,
+                            groups=groups
                         )
                         output3 += "\n" if output3 else ""
         else:
@@ -857,6 +889,8 @@ def parse_config():
     webfilter_profiles = []
     application_lists = []
     ips_sensors = []
+    users = []
+    groups = []
 
     # Parse interfaces
     interface_pattern = re.compile(r'config system interface\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
@@ -976,6 +1010,22 @@ def parse_config():
         service_groups[group_name] = members
         logger.debug("Found service group: %s with members: %s", group_name, members)
 
+    # Parse users
+    user_pattern = re.compile(r'config user local\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
+    for match in user_pattern.finditer(content):
+        user_name = match.group(1)
+        if user_name not in users:
+            users.append(user_name)
+            logger.debug("Found user: %s", user_name)
+
+    # Parse groups
+    group_pattern = re.compile(r'config user group\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
+    for match in group_pattern.finditer(content):
+        group_name = match.group(1)
+        if group_name not in groups:
+            groups.append(group_name)
+            logger.debug("Found user group: %s", group_name)
+
     # Parse SSL/SSH profiles
     ssl_ssh_pattern = re.compile(r'config firewall ssl-ssh-profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in ssl_ssh_pattern.finditer(content):
@@ -1013,12 +1063,14 @@ def parse_config():
             ips_sensors.append(sensor_name)
             logger.debug("Found IPS sensor: %s", sensor_name)
 
-    # Fallback line-by-line parsing for profiles
+    # Fallback line-by-line parsing for profiles, users, and groups
     lines = content.splitlines()
     inside_ssl_ssh_section = False
     inside_webfilter_section = False
     inside_application_section = False
     inside_ips_section = False
+    inside_user_section = False
+    inside_group_section = False
     webfilter_section_ended = False
     nested_level = 0
     for i, line in enumerate(lines):
@@ -1041,6 +1093,14 @@ def parse_config():
         if line.startswith('config ips sensor') and not inside_ips_section:
             inside_ips_section = True
             logger.debug("Entered config ips sensor section")
+            continue
+        if line.startswith('config user local') and not inside_user_section:
+            inside_user_section = True
+            logger.debug("Entered config user local section")
+            continue
+        if line.startswith('config user group') and not inside_group_section:
+            inside_group_section = True
+            logger.debug("Entered config user group section")
             continue
         if line.startswith('config ') and inside_webfilter_section and webfilter_section_ended:
             logger.debug("Exiting config webfilter profile section with %d profiles due to new config section", len(webfilter_profiles))
@@ -1068,25 +1128,37 @@ def parse_config():
             elif inside_ips_section:
                 inside_ips_section = False
                 logger.debug("Exited config ips sensor section")
+            elif inside_user_section:
+                inside_user_section = False
+                logger.debug("Exited config user local section")
+            elif inside_group_section:
+                inside_group_section = False
+                logger.debug("Exited config user group section")
             continue
-        if line.startswith('edit ') and (inside_ssl_ssh_section or inside_webfilter_section or inside_application_section or inside_ips_section):
+        if line.startswith('edit ') and (inside_ssl_ssh_section or inside_webfilter_section or inside_application_section or inside_ips_section or inside_user_section or inside_group_section):
             logger.debug("Processing edit line: %s", line)
             match = re.match(r'edit\s+"([^"]+)"', line)
             if match:
-                profile_name = match.group(1)
-                if inside_ssl_ssh_section and profile_name not in ssl_ssh_profiles:
-                    ssl_ssh_profiles.append(profile_name)
-                    logger.debug("Found SSL/SSH profile (fallback): %s", profile_name)
-                elif inside_webfilter_section and profile_name not in webfilter_profiles:
-                    webfilter_profiles.append(profile_name)
+                name = match.group(1)
+                if inside_ssl_ssh_section and name not in ssl_ssh_profiles:
+                    ssl_ssh_profiles.append(name)
+                    logger.debug("Found SSL/SSH profile (fallback): %s", name)
+                elif inside_webfilter_section and name not in webfilter_profiles:
+                    webfilter_profiles.append(name)
                     webfilter_count += 1
-                    logger.debug("Found webfilter profile (fallback): %s", profile_name)
-                elif inside_application_section and profile_name not in application_lists:
-                    application_lists.append(profile_name)
-                    logger.debug("Found application list (fallback): %s", profile_name)
-                elif inside_ips_section and profile_name not in ips_sensors:
-                    ips_sensors.append(profile_name)
-                    logger.debug("Found IPS sensor (fallback): %s", profile_name)
+                    logger.debug("Found webfilter profile (fallback): %s", name)
+                elif inside_application_section and name not in application_lists:
+                    application_lists.append(name)
+                    logger.debug("Found application list (fallback): %s", name)
+                elif inside_ips_section and name not in ips_sensors:
+                    ips_sensors.append(name)
+                    logger.debug("Found IPS sensor (fallback): %s", name)
+                elif inside_user_section and name not in users:
+                    users.append(name)
+                    logger.debug("Found user (fallback): %s", name)
+                elif inside_group_section and name not in groups:
+                    groups.append(name)
+                    logger.debug("Found user group (fallback): %s", name)
             else:
                 logger.debug("Edit line did not match regex: %s", line)
 
@@ -1100,7 +1172,9 @@ def parse_config():
         "ssl_ssh_profiles": ssl_ssh_profiles,
         "webfilter_profiles": webfilter_profiles,
         "application_lists": application_lists,
-        "ips_sensors": ips_sensors
+        "ips_sensors": ips_sensors,
+        "users": users,
+        "groups": groups
     }
     
     # Save parsed config for use in index

@@ -1,3 +1,4 @@
+// scripts.js (Version 1.5)
 let policies = [];
 let interfaces = [];
 let addresses = [];
@@ -7,6 +8,31 @@ let sslSshProfiles = [];
 let webfilterProfiles = [];
 let applicationLists = [];
 let ipsSensors = [];
+let users = [];
+let groups = [];
+
+function showNotification(message, type = 'success') {
+    const container = document.getElementById('notification-container');
+    if (!container) {
+        console.error('Notification container not found');
+        return;
+    }
+
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+
+    container.appendChild(notification);
+
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            notification.remove();
+        }, 500); // Match the animation duration
+    }, 3000);
+}
 
 function addPolicy() {
     const policyId = Date.now().toString();
@@ -27,7 +53,9 @@ function addPolicy() {
         logtraffic: 'all',
         logtraffic_start: 'enable',
         auto_asic_offload: 'enable',
-        nat: 'disable'
+        nat: 'disable',
+        users: [],
+        groups: []
     });
     renderPolicyList();
     selectPolicy(policyId);
@@ -79,11 +107,12 @@ function selectPolicy(policyId) {
         form.querySelector('.auto-asic-offload').value = policy.auto_asic_offload || 'enable';
         form.querySelector('.nat').value = policy.nat || 'disable';
 
-        renderInterfaces(form.querySelector('.src-interfaces'), policy.srcInterfaces, 'src');
-        renderInterfaces(form.querySelector('.dst-interfaces'), policy.dstInterfaces, 'dst');
-        renderAddresses(form.querySelector('.src-addresses'), policy.srcAddresses, 'src');
-        renderAddresses(form.querySelector('.dst-addresses'), policy.dstAddresses, 'dst');
+        renderInterfaces(form.querySelector('.src-interfaces .interface-items'), policy.srcInterfaces, 'src');
+        renderInterfaces(form.querySelector('.dst-interfaces .interface-items'), policy.dstInterfaces, 'dst');
+        renderAddresses(form.querySelector('.src-addresses .address-items'), policy.srcAddresses, 'src');
+        renderAddresses(form.querySelector('.dst-addresses .address-items'), policy.dstAddresses, 'dst');
         renderServices(form.querySelector('.services'), policy.services);
+        renderUsersGroups(form.querySelector('.src-users-groups .user-group-items'), policy.users, policy.groups);
     } catch (error) {
         console.error('Error in selectPolicy:', error);
     }
@@ -91,7 +120,7 @@ function selectPolicy(policyId) {
 
 function renderInterfaces(container, items, type) {
     if (!container) {
-        console.error('Interface container not found');
+        console.error('Interface items container not found');
         return;
     }
     container.innerHTML = '';
@@ -111,7 +140,7 @@ function renderInterfaces(container, items, type) {
 
 function renderAddresses(container, items, type) {
     if (!container) {
-        console.error('Address container not found');
+        console.error('Address items container not found');
         return;
     }
     container.innerHTML = '';
@@ -161,6 +190,32 @@ function renderServices(container, items) {
                 <input type="text" value="${item.port}" onchange="updateCustomService(${index}, 'port', this.value)" placeholder="Port">
             ` : ''}
             <button onclick="deleteService(${index})">Delete</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function renderUsersGroups(container, userItems, groupItems) {
+    if (!container) {
+        console.error('Users/Groups items container not found');
+        return;
+    }
+    container.innerHTML = '';
+    [...userItems, ...groupItems].forEach((item, index) => {
+        const isUser = userItems.includes(item);
+        const div = document.createElement('div');
+        div.className = 'user-group-item';
+        div.innerHTML = `
+            <select onchange="updateUserOrGroup(${index}, this.value)">
+                <option value="">Select User/Group</option>
+                <optgroup label="Users">
+                    ${users.map(user => `<option value="user:${user}" ${isUser && item === user ? 'selected' : ''}>${user}</option>`).join('')}
+                </optgroup>
+                <optgroup label="Groups">
+                    ${groups.map(group => `<option value="group:${group}" ${!isUser && item === group ? 'selected' : ''}>${group}</option>`).join('')}
+                </optgroup>
+            </select>
+            <button onclick="deleteUserOrGroup(${index})">Delete</button>
         `;
         container.appendChild(div);
     });
@@ -268,6 +323,21 @@ function addService(button) {
     selectPolicy(policyId);
 }
 
+function addSrcUserOrGroup(button) {
+    const policyId = button.closest('#policy-form')?.dataset.policyId;
+    if (!policyId) {
+        console.error('Policy ID not found for adding user or group');
+        return;
+    }
+    const policy = policies.find(p => p.id === policyId);
+    if (!policy) {
+        console.error(`Policy with ID ${policyId} not found`);
+        return;
+    }
+    policy.users.push('');
+    selectPolicy(policyId);
+}
+
 function updateInterface(type, index, value) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
@@ -340,6 +410,38 @@ function updateCustomService(index, field, value) {
     policy.services[index][field] = value;
 }
 
+function updateUserOrGroup(index, value) {
+    const policyId = document.getElementById('policy-form')?.dataset.policyId;
+    if (!policyId) {
+        console.error('Policy ID not found for updating user or group');
+        return;
+    }
+    const policy = policies.find(p => p.id === policyId);
+    if (!policy) {
+        console.error(`Policy with ID ${policyId} not found`);
+        return;
+    }
+    const [type, name] = value.split(':');
+    const totalItems = policy.users.length + policy.groups.length;
+    if (index < policy.users.length) {
+        if (type === 'user') {
+            policy.users[index] = name;
+        } else if (type === 'group') {
+            policy.users.splice(index, 1);
+            policy.groups.splice(index - policy.users.length, 0, name);
+        }
+    } else {
+        const groupIndex = index - policy.users.length;
+        if (type === 'group') {
+            policy.groups[groupIndex] = name;
+        } else if (type === 'user') {
+            policy.groups.splice(groupIndex, 1);
+            policy.users.splice(index, 0, name);
+        }
+    }
+    selectPolicy(policyId);
+}
+
 function deleteInterface(type, index) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
@@ -393,6 +495,25 @@ function deleteService(index) {
     selectPolicy(policyId);
 }
 
+function deleteUserOrGroup(index) {
+    const policyId = document.getElementById('policy-form')?.dataset.policyId;
+    if (!policyId) {
+        console.error('Policy ID not found for deleting user or group');
+        return;
+    }
+    const policy = policies.find(p => p.id === policyId);
+    if (!policy) {
+        console.error(`Policy with ID ${policyId} not found`);
+        return;
+    }
+    if (index < policy.users.length) {
+        policy.users.splice(index, 1);
+    } else {
+        policy.groups.splice(index - policy.users.length, 1);
+    }
+    selectPolicy(policyId);
+}
+
 function deletePolicy(policyId) {
     policies = policies.filter(p => p.id !== policyId);
     renderPolicyList();
@@ -409,7 +530,7 @@ function savePolicy(button) {
         const policyId = button.closest('#policy-form')?.dataset.policyId;
         if (!policyId) {
             console.error('Policy ID not found in form dataset');
-            alert('Error: Policy ID not found');
+            showNotification('Error: Policy ID not found', 'error');
             return;
         }
         console.log('Policy ID:', policyId);
@@ -417,7 +538,7 @@ function savePolicy(button) {
         const policy = policies.find(p => p.id === policyId);
         if (!policy) {
             console.error(`Policy with ID ${policyId} not found`);
-            alert('Error: Policy not found');
+            showNotification('Error: Policy not found', 'error');
             return;
         }
         console.log('Policy found:', policy);
@@ -425,7 +546,7 @@ function savePolicy(button) {
         const form = button.closest('#policy-form');
         if (!form) {
             console.error('Policy form not found');
-            alert('Error: Policy form not found');
+            showNotification('Error: Policy form not found', 'error');
             return;
         }
         console.log('Form found');
@@ -476,9 +597,10 @@ function savePolicy(button) {
         renderPolicyList();
         selectPolicy(policyId);
         console.log('Policy saved successfully');
+        showNotification('Policy saved successfully', 'success');
     } catch (error) {
         console.error('Error in savePolicy:', error);
-        alert('Error saving policy: ' + error.message);
+        showNotification('Error saving policy: ' + error.message, 'error');
     }
 }
 
@@ -513,18 +635,21 @@ function clonePolicy(button) {
                 logtraffic: data.new_policy.logtraffic,
                 logtraffic_start: data.new_policy.logtraffic_start,
                 auto_asic_offload: data.new_policy.auto_asic_offload,
-                nat: data.new_policy.nat
+                nat: data.new_policy.nat,
+                users: data.new_policy.users,
+                groups: data.new_policy.groups
             });
             renderPolicyList();
             selectPolicy(data.new_policy.policy_id);
+            showNotification('Policy cloned successfully', 'success');
         } else {
             console.error('Error cloning policy:', data.error);
-            alert('Error cloning policy: ' + data.error);
+            showNotification('Error cloning policy: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error cloning policy:', error);
-        alert('Error cloning policy');
+        showNotification('Error cloning policy', 'error');
     });
 }
 
@@ -545,11 +670,12 @@ function clearForm(button) {
     form.querySelector('.logtraffic-start').value = 'enable';
     form.querySelector('.auto-asic-offload').value = 'enable';
     form.querySelector('.nat').value = 'disable';
-    form.querySelector('.src-interfaces').innerHTML = '';
-    form.querySelector('.dst-interfaces').innerHTML = '';
-    form.querySelector('.src-addresses').innerHTML = '';
-    form.querySelector('.dst-addresses').innerHTML = '';
+    form.querySelector('.src-interfaces .interface-items').innerHTML = '';
+    form.querySelector('.dst-interfaces .interface-items').innerHTML = '';
+    form.querySelector('.src-addresses .address-items').innerHTML = '';
+    form.querySelector('.dst-addresses .address-items').innerHTML = '';
     form.querySelector('.services').innerHTML = '';
+    form.querySelector('.src-users-groups .user-group-items').innerHTML = '';
 
     const policyId = form.dataset.policyId;
     const policy = policies.find(p => p.id === policyId);
@@ -559,6 +685,8 @@ function clearForm(button) {
         policy.srcAddresses = [];
         policy.dstAddresses = [];
         policy.services = [];
+        policy.users = [];
+        policy.groups = [];
     }
 }
 
@@ -566,7 +694,7 @@ function saveTemplate() {
     const templateName = document.getElementById('template-name')?.value;
     if (!templateName) {
         console.error('Template name not provided');
-        alert('Please enter a template name');
+        showNotification('Please enter a template name', 'error');
         return;
     }
     const formData = new FormData();
@@ -588,7 +716,9 @@ function saveTemplate() {
         logtraffic: p.logtraffic,
         logtraffic_start: p.logtraffic_start,
         auto_asic_offload: p.auto_asic_offload,
-        nat: p.nat
+        nat: p.nat,
+        users: p.users,
+        groups: p.groups
     }))));
 
     fetch('/save_template', {
@@ -597,12 +727,12 @@ function saveTemplate() {
     })
     .then(response => response.json())
     .then(data => {
-        alert(data.message);
+        showNotification(data.message, 'success');
         loadTemplateList();
     })
     .catch(error => {
         console.error('Error saving template:', error);
-        alert('Error saving template');
+        showNotification('Error saving template', 'error');
     });
 }
 
@@ -638,7 +768,7 @@ function loadTemplate() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
         console.error('No template selected');
-        alert('Please select a template');
+        showNotification('Please select a template', 'error');
         return;
     }
     fetch(`/get_template/${templateName}`)
@@ -662,7 +792,9 @@ function loadTemplate() {
                 logtraffic: p.logtraffic,
                 logtraffic_start: p.logtraffic_start,
                 auto_asic_offload: p.auto_asic_offload,
-                nat: p.nat
+                nat: p.nat,
+                users: p.users || [],
+                groups: p.groups || []
             }));
 
             // Update global config variables with template data
@@ -674,6 +806,8 @@ function loadTemplate() {
             webfilterProfiles = data.config.webfilter_profiles || [];
             applicationLists = data.config.application_lists || [];
             ipsSensors = data.config.ips_sensors || [];
+            users = data.config.users || [];
+            groups = data.config.groups || [];
 
             // Merge with existing config data if available
             try {
@@ -688,6 +822,8 @@ function loadTemplate() {
                         webfilterProfiles = [...new Set([...webfilterProfiles, ...(config.webfilter_profiles || [])])];
                         applicationLists = [...new Set([...applicationLists, ...(config.application_lists || [])])];
                         ipsSensors = [...new Set([...ipsSensors, ...(config.ips_sensors || [])])];
+                        users = [...new Set([...users, ...(config.users || [])])];
+                        groups = [...new Set([...groups, ...(config.groups || [])])];
                         updateDropdowns();
                         renderPolicyList();
                         if (policies.length > 0) {
@@ -698,7 +834,7 @@ function loadTemplate() {
                         if (templateNameInput) {
                             templateNameInput.value = templateName;
                         }
-                        alert(`Template '${templateName}' loaded successfully`);
+                        showNotification(`Template '${templateName}' loaded successfully`, 'success');
                     })
                     .catch(() => {
                         updateDropdowns();
@@ -711,7 +847,7 @@ function loadTemplate() {
                         if (templateNameInput) {
                             templateNameInput.value = templateName;
                         }
-                        alert(`Template '${templateName}' loaded successfully`);
+                        showNotification(`Template '${templateName}' loaded successfully`, 'success');
                     });
             } catch (error) {
                 console.error('Error merging config data:', error);
@@ -725,16 +861,16 @@ function loadTemplate() {
                 if (templateNameInput) {
                     templateNameInput.value = templateName;
                 }
-                alert(`Template '${templateName}' loaded successfully`);
+                showNotification(`Template '${templateName}' loaded successfully`, 'success');
             }
         } else {
             console.error('Error loading template:', data.error);
-            alert('Error loading template: ' + data.error);
+            showNotification('Error loading template: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error loading template:', error);
-        alert('Error loading template');
+        showNotification('Error loading template', 'error');
     });
 }
 
@@ -742,7 +878,7 @@ function cloneTemplate() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
         console.error('No template selected for cloning');
-        alert('Please select a template to clone');
+        showNotification('Please select a template to clone', 'error');
         return;
     }
     fetch(`/clone_template/${templateName}`, {
@@ -751,16 +887,16 @@ function cloneTemplate() {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            alert(`Template cloned as ${data.new_template_name}`);
+            showNotification(`Template cloned as ${data.new_template_name}`, 'success');
             loadTemplateList();
         } else {
             console.error('Error cloning template:', data.error);
-            alert('Error cloning template: ' + data.error);
+            showNotification('Error cloning template: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error cloning template:', error);
-        alert('Error cloning template');
+        showNotification('Error cloning template', 'error');
     });
 }
 
@@ -768,7 +904,7 @@ function deleteTemplate() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
         console.error('No template selected for deletion');
-        alert('Please select a template');
+        showNotification('Please select a template', 'error');
         return;
     }
     if (confirm(`Are you sure you want to delete ${templateName}?`)) {
@@ -777,7 +913,7 @@ function deleteTemplate() {
         })
         .then(response => response.json())
         .then(data => {
-            alert(data.message);
+            showNotification(data.message, 'success');
             loadTemplateList();
             // Clear the template name input field after deletion
             const templateNameInput = document.getElementById('template-name');
@@ -787,7 +923,7 @@ function deleteTemplate() {
         })
         .catch(error => {
             console.error('Error deleting template:', error);
-            alert('Error deleting template');
+            showNotification('Error deleting template', 'error');
         });
     }
 }
@@ -798,17 +934,17 @@ function renameTemplate() {
 
     if (!oldName) {
         console.error('No template selected for renaming');
-        alert('Please select a template to rename');
+        showNotification('Please select a template to rename', 'error');
         return;
     }
     if (!newName) {
         console.error('New template name not provided');
-        alert('Please enter a new template name');
+        showNotification('Please enter a new template name', 'error');
         return;
     }
     if (oldName === newName) {
         console.warn('Old and new template names are the same');
-        alert('The new template name is the same as the current name');
+        showNotification('The new template name is the same as the current name', 'error');
         return;
     }
 
@@ -820,17 +956,17 @@ function renameTemplate() {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            alert(`Template renamed to ${newName}`);
+            showNotification(`Template renamed to ${newName}`, 'success');
             window.preselectedTemplate = newName; // Set preselected template to the new name
             loadTemplateList(); // Refresh the template list and re-select the renamed template
         } else {
             console.error('Error renaming template:', data.error);
-            alert('Error renaming template: ' + data.error);
+            showNotification('Error renaming template: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error renaming template:', error);
-        alert('Error renaming template');
+        showNotification('Error renaming template', 'error');
     });
 }
 
@@ -838,7 +974,7 @@ function copyUrl() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
         console.error('No template selected for copying URL');
-        alert('Please select a template to copy its URL');
+        showNotification('Please select a template to copy its URL', 'error');
         return;
     }
 
@@ -863,28 +999,28 @@ function copyUrl() {
             navigator.clipboard.writeText(shortUrl)
                 .then(() => {
                     console.log(`Successfully copied URL: ${shortUrl}`);
-                    alert('URL copied to clipboard');
+                    showNotification('URL copied to clipboard', 'success');
                 })
                 .catch(error => {
                     console.error('Error copying URL:', error.message);
                     if (error.message.includes('secure context')) {
                         console.error('Clipboard API requires a secure context (HTTPS or localhost). Ensure the page is served over HTTPS.');
-                        alert('Error copying URL: This feature requires a secure context (HTTPS or localhost).');
+                        showNotification('Error copying URL: This feature requires a secure context (HTTPS or localhost)', 'error');
                     } else if (error.message.includes('permission')) {
                         console.error('Clipboard access denied. Check browser permissions for clipboard access.');
-                        alert('Error copying URL: Clipboard access denied. Please allow clipboard permissions in your browser.');
+                        showNotification('Error copying URL: Clipboard access denied. Please allow clipboard permissions in your browser', 'error');
                     } else {
-                        alert('Error copying URL: ' + error.message);
+                        showNotification('Error copying URL: ' + error.message, 'error');
                     }
                 });
         } else {
             console.error('Error generating URL:', data.error);
-            alert('Error generating URL: ' + data.error);
+            showNotification('Error generating URL: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error generating URL:', error);
-        alert('Error generating URL');
+        showNotification('Error generating URL', 'error');
     });
 }
 
@@ -892,7 +1028,7 @@ function importTemplate(event) {
     const fileInput = event.target;
     if (!fileInput?.files.length) {
         console.error('No template file selected');
-        alert('Please select a JSON file to import');
+        showNotification('Please select a JSON file to import', 'error');
         return;
     }
 
@@ -917,28 +1053,28 @@ function importTemplate(event) {
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    alert(`Template '${templateData.name}' imported successfully`);
+                    showNotification(`Template '${templateData.name}' imported successfully`, 'success');
                     loadTemplateList();
                     // Reset the file input
                     fileInput.value = '';
                 } else {
                     console.error('Error importing template:', data.error);
-                    alert('Error importing template: ' + data.error);
+                    showNotification('Error importing template: ' + data.error, 'error');
                 }
             })
             .catch(error => {
                 console.error('Error importing template:', error);
-                alert('Error importing template');
+                showNotification('Error importing template', 'error');
             });
         } catch (error) {
             console.error('Error parsing template file:', error);
-            alert('Error parsing template file: ' + error.message);
+            showNotification('Error parsing template file: ' + error.message, 'error');
         }
     };
 
     reader.onerror = function() {
         console.error('Error reading template file');
-        alert('Error reading template file');
+        showNotification('Error reading template file', 'error');
     };
 
     reader.readAsText(file);
@@ -948,7 +1084,7 @@ function exportTemplate() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
         console.error('No template selected for export');
-        alert('Please select a template to export');
+        showNotification('Please select a template to export', 'error');
         return;
     }
 
@@ -970,11 +1106,11 @@ function exportTemplate() {
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-        alert(`Template '${templateName}' exported successfully`);
+        showNotification(`Template '${templateName}' exported successfully`, 'success');
     })
     .catch(error => {
         console.error('Error exporting template:', error);
-        alert('Error exporting template: ' + error.message);
+        showNotification('Error exporting template: ' + error.message, 'error');
     });
 }
 
@@ -982,7 +1118,7 @@ function importConfig() {
     const fileInput = document.getElementById('config-file');
     if (!fileInput?.files.length) {
         console.error('No config file selected');
-        alert('Please select a file');
+        showNotification('Please select a file', 'error');
         return;
     }
     const formData = new FormData();
@@ -1002,24 +1138,26 @@ function importConfig() {
         webfilterProfiles = data.webfilter_profiles || [];
         applicationLists = data.application_lists || [];
         ipsSensors = data.ips_sensors || [];
+        users = data.users || [];
+        groups = data.groups || [];
         
         updateDropdowns();
         renderPolicyList();
         if (policies.length > 0) {
             selectPolicy(policies[0].id);
         }
-        alert('Configuration imported successfully');
+        showNotification('Configuration imported successfully', 'success');
     })
     .catch(error => {
         console.error('Error importing config:', error);
-        alert('Error importing config');
+        showNotification('Error importing config', 'error');
     });
 }
 
 function generatePolicies() {
     if (!policies.length) {
         console.error('No policies to generate');
-        alert('No policies to generate');
+        showNotification('No policies to generate', 'error');
         return;
     }
     const formData = new FormData();
@@ -1040,7 +1178,9 @@ function generatePolicies() {
         logtraffic: p.logtraffic,
         logtraffic_start: p.logtraffic_start,
         auto_asic_offload: p.auto_asic_offload,
-        nat: p.nat
+        nat: p.nat,
+        users: p.users,
+        groups: p.groups
     }))));
 
     fetch('/generate_policy', {
@@ -1052,10 +1192,11 @@ function generatePolicies() {
         document.getElementById('output1').textContent = data.outputs.map(o => o.output1).join('\n\n');
         document.getElementById('output2').textContent = data.outputs.map(o => o.output2).join('\n\n');
         document.getElementById('output3').textContent = data.outputs.map(o => o.output3).join('\n\n');
+        showNotification('Policies generated successfully', 'success');
     })
     .catch(error => {
         console.error('Error generating policies:', error);
-        alert('Error generating policies');
+        showNotification('Error generating policies', 'error');
     });
 }
 
@@ -1068,24 +1209,24 @@ function copyOutput(outputId) {
     const text = outputElement.textContent;
     if (!text) {
         console.error(`No content to copy for element ${outputId}`);
-        alert('No content to copy');
+        showNotification('No content to copy', 'error');
         return;
     }
     navigator.clipboard.writeText(text)
         .then(() => {
             console.log(`Successfully copied content for ${outputId}`);
-            alert('Output copied to clipboard');
+            showNotification('Output copied to clipboard', 'success');
         })
         .catch(error => {
             console.error('Error copying output:', error.message);
             if (error.message.includes('secure context')) {
                 console.error('Clipboard API requires a secure context (HTTPS or localhost). Ensure the page is served over HTTPS.');
-                alert('Error copying output: This feature requires a secure context (HTTPS or localhost).');
+                showNotification('Error copying output: This feature requires a secure context (HTTPS or localhost)', 'error');
             } else if (error.message.includes('permission')) {
                 console.error('Clipboard access denied. Check browser permissions for clipboard access.');
-                alert('Error copying output: Clipboard access denied. Please allow clipboard permissions in your browser.');
+                showNotification('Error copying output: Clipboard access denied. Please allow clipboard permissions in your browser', 'error');
             } else {
-                alert('Error copying output: ' + error.message);
+                showNotification('Error copying output: ' + error.message, 'error');
             }
         });
 }
@@ -1108,6 +1249,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleButton = document.getElementById('theme-toggle');
     toggleButton.textContent = savedTheme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
     toggleButton.setAttribute('aria-label', `Toggle ${savedTheme === 'dark' ? 'light' : 'dark'} mode`);
+    toggleButton.addEventListener('click', toggleTheme); // Attach the event listener
 
     loadTemplateList();
     // Only add a new policy if no pre-selected template is provided

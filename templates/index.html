@@ -1,196 +1,203 @@
+<!-- index.html (Version 1.6) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FGT Policy Generator</title>
-    <link rel="stylesheet" href="/static/styles.css">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">	
-    <script src="/static/scripts.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="{{ url_for('static', filename='scripts.js') }}" defer></script>
+    <script>
+        // Pass preselected template name to JavaScript if it exists
+        {% if preselected_template %}
+            window.preselectedTemplate = "{{ preselected_template }}";
+        {% endif %}
+    </script>
 </head>
 <body>
+    <div id="notification-container"></div>
     <div class="container">
         <div class="sidebar">
             <h2>FGT Policy Generator</h2>
-            <button id="theme-toggle" aria-label="Toggle dark mode" onclick="toggleTheme()">🌙 Dark Mode</button>
+            <button id="theme-toggle" aria-label="Toggle dark mode">🌙 Dark Mode</button>
+
             <div class="template-section">
                 <h3>Load Template</h3>
                 <select id="template-select">
                     <option value="">Select Template</option>
                 </select>
-                <button onclick="loadTemplate()" aria-label="Load template">Load</button>
-                <button onclick="cloneTemplate()" aria-label="Clone template">Clone</button>
-                <button onclick="copyUrl()" aria-label="Copy URL for template">Copy URL</button>
-                <h3>Edit Template</h3>
-                <input type="text" id="template-name" placeholder="Template Name" aria-label="Template name">
-                <button onclick="saveTemplate()" aria-label="Save template">Save</button>
-                <button onclick="deleteTemplate()" aria-label="Delete template">Delete</button>
-                <button onclick="renameTemplate()" aria-label="Rename template">Rename</button>
-                <input type="file" id="template-file" accept=".json" style="display: none;" aria-label="Upload template file">
-                <button onclick="document.getElementById('template-file').click()" aria-label="Import template">Import</button>
-                <button onclick="exportTemplate()" aria-label="Export template">Export</button>
+                <button onclick="loadTemplate()">Load</button>
+                <button onclick="cloneTemplate()">Clone</button>
+                <button onclick="copyUrl()">Copy URL</button>
+                <button onclick="document.getElementById('import-template').click()">Edit Template</button>
+                <input type="file" id="import-template" style="display: none;" accept=".json" onchange="importTemplate(event)">
             </div>
-            <h3>Policies</h3>
+
+            <div class="template-section">
+                <h3>Policies</h3>
+                <input type="text" id="template-name" placeholder="Template Name">
+                <button onclick="saveTemplate()">Save</button>
+                <button onclick="deleteTemplate()">Delete</button>
+                <button onclick="renameTemplate()">Rename</button>
+                <button onclick="exportTemplate()">Export</button>
+                <button onclick="addPolicy()">Add Policy</button>
+            </div>
+
             <div id="policy-list"></div>
-            <button onclick="addPolicy()" aria-label="Add new policy">Add Policy</button>
         </div>
+
         <div class="main-content">
             <h1>Policy Configuration</h1>
+
             <div class="config-section">
                 <h2>Import FortiGate Config</h2>
-                <input type="file" id="config-file" accept=".conf,.txt" aria-label="Upload config file">
-                <button onclick="importConfig()" aria-label="Import config">Import Config</button>
+                <input type="file" id="config-file">
+                <button onclick="importConfig()">Import Config</button>
             </div>
-            <div class="policy-form">
+
+            <form id="policy-form" class="policy-form">
                 <h2>Policy Details</h2>
-                <div id="policy-form">
-                    <div>
-                        <label>Policy Name</label>
-                        <input type="text" class="policy-name" placeholder="Policy Name" maxlength="32" aria-label="Policy name">
+
+                <div class="form-row">
+                    <div class="form-column-left">
+                        <label for="policy-name">Policy Name</label>
+                        <input type="text" class="policy-name" placeholder="Policy Name">
                     </div>
-                    <div>
-                        <label>Policy Comment</label>
-                        <input type="text" class="policy-comment" placeholder="Policy Comment" aria-label="Policy comment">
-                    </div>
-                    <div class="form-row">
-                        <div class="form-column-left">
-                            <div>
-                                <label>Source Interfaces</label>
-                                <div class="src-interfaces"></div>
-                                <button onclick="addSrcInterface(this)" aria-label="Add source interface">+ Add Source Interface</button>
-                            </div>
-                            <div>
-                                <label>Source Addresses</label>
-                                <div class="src-addresses"></div>
-                                <button onclick="addSrcAddress(this)" aria-label="Add source address">+ Add Source Address</button>
-                            </div>
-                        </div>
-                        <div class="form-column-right">
-                            <div>
-                                <label>Destination Interfaces</label>
-                                <div class="dst-interfaces"></div>
-                                <button onclick="addDstInterface(this)" aria-label="Add destination interface">+ Add Destination Interface</button>
-                            </div>
-                            <div>
-                                <label>Destination Addresses</label>
-                                <div class="dst-addresses"></div>
-                                <button onclick="addDstAddress(this)" aria-label="Add destination address">+ Add Destination Address</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <label>Services</label>
-                        <div class="services"></div>
-                        <button onclick="addService(this)" aria-label="Add service or group">+ Add Service/Group</button>
-                    </div>
-                    <div>
-                        <label>Action</label>
-                        <select class="action" aria-label="Policy action">
-                            <option value="accept">Accept</option>
-                            <option value="deny">Deny</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>SSL/SSH Profile</label>
-                        <select class="ssl-ssh-profile" aria-label="SSL/SSH profile">
-                            <option value="">None</option>
-                            {% for profile in ssl_ssh_profiles %}
-                                <option value="{{ profile }}">{{ profile }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label>Webfilter Profile</label>
-                        <select class="webfilter-profile" aria-label="Webfilter profile">
-                            <option value="">None</option>
-                            {% for profile in webfilter_profiles %}
-                                <option value="{{ profile }}">{{ profile }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label>Application List</label>
-                        <select class="application-list" aria-label="Application list">
-                            <option value="">None</option>
-                            {% for list in application_lists %}
-                                <option value="{{ list }}">{{ list }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label>IPS Sensor</label>
-                        <select class="ips-sensor" aria-label="IPS sensor">
-                            <option value="">None</option>
-                            {% for sensor in ips_sensors %}
-                                <option value="{{ sensor }}">{{ sensor }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label>Log Traffic</label>
-                        <select class="logtraffic" aria-label="Log traffic">
-                            <option value="all">All</option>
-                            <option value="utm">UTM</option>
-                            <option value="disable">Disable</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>Log Traffic Start</label>
-                        <select class="logtraffic-start" aria-label="Log traffic start">
-                            <option value="enable">Enable</option>
-                            <option value="disable">Disable</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>Auto ASIC Offload</label>
-                        <select class="auto-asic-offload" aria-label="Auto ASIC offload">
-                            <option value="enable">Enable</option>
-                            <option value="disable">Disable</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>NAT</label>
-                        <select class="nat" aria-label="NAT setting">
-                            <option value="disable">Disable</option>
-                            <option value="enable">Enable</option>
-                        </select>
-                    </div>
-                    <div>
-                        <button onclick="savePolicy(this)" aria-label="Save policy">Save Policy</button>
-                        <button onclick="clearForm(this)" aria-label="Clear form">Clear Form</button>
-                        <button onclick="clonePolicy(this)" aria-label="Clone policy">Clone Policy</button>
+                    <div class="form-column-right">
+                        <label for="policy-comment">Policy Comment</label>
+                        <input type="text" class="policy-comment" placeholder="Policy Comment">
                     </div>
                 </div>
-            </div>
-            <button class="generate-policies-btn" onclick="generatePolicies()" aria-label="Generate all policies">Generate All Policies</button>
-        </div>
-        <div class="output-section">
-            <div>
-                <h2>Output 1: All-in-One Policies</h2>
-                <pre id="output1"></pre>
-                <button onclick="copyOutput('output1')" aria-label="Copy Output 1">Copy</button>
-            </div>
-            <div>
-                <h2>Output 2: One Policy Per Service</h2>
-                <pre id="output2"></pre>
-                <button onclick="copyOutput('output2')" aria-label="Copy Output 2">Copy</button>
-            </div>
-            <div>
-                <h2>Output 3: Per Src/Dst Interface and Service</h2>
-                <pre id="output3"></pre>
-                <button onclick="copyOutput('output3')" aria-label="Copy Output 3">Copy</button>
+
+                <div class="form-row">
+                    <div class="form-column-left">
+                        <div class="src-interfaces">
+                            <label>Source Interfaces</label>
+                            <div class="interface-items"></div>
+                        </div>
+                        <button type="button" onclick="addSrcInterface(this)">+ Add Source Interface</button>
+
+                        <div class="src-addresses">
+                            <label>Source Addresses</label>
+                            <div class="address-items"></div>
+                        </div>
+                        <button type="button" onclick="addSrcAddress(this)">+ Add Source Address</button>
+
+                        <div class="src-users-groups">
+                            <label>Users/Groups</label>
+                            <div class="user-group-items"></div>
+                            <button type="button" onclick="addSrcUserOrGroup(this)">+ Add User/Group</button>
+                        </div>
+                    </div>
+
+                    <div class="form-column-right">
+                        <div class="dst-interfaces">
+                            <label>Destination Interfaces</label>
+                            <div class="interface-items"></div>
+                        </div>
+                        <button type="button" onclick="addDstInterface(this)">+ Add Destination Interface</button>
+
+                        <div class="dst-addresses">
+                            <label>Destination Addresses</label>
+                            <div class="address-items"></div>
+                        </div>
+                        <button type="button" onclick="addDstAddress(this)">+ Add Destination Address</button>
+                    </div>
+                </div>
+
+                <label for="services">Services</label>
+                <div class="services"></div>
+                <button type="button" onclick="addService(this)">+ Add Service/Group</button>
+
+                <label for="action">Action</label>
+                <select class="action">
+                    <option value="accept">Accept</option>
+                    <option value="deny">Deny</option>
+                </select>
+
+                <label for="ssl-ssh-profile">SSL/SSH Profile</label>
+                <select class="ssl-ssh-profile">
+                    <option value="">None</option>
+                    {% for profile in ssl_ssh_profiles %}
+                        <option value="{{ profile }}">{{ profile }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="webfilter-profile">Webfilter Profile</label>
+                <select class="webfilter-profile">
+                    <option value="">None</option>
+                    {% for profile in webfilter_profiles %}
+                        <option value="{{ profile }}">{{ profile }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="application-list">Application List</label>
+                <select class="application-list">
+                    <option value="">None</option>
+                    {% for list in application_lists %}
+                        <option value="{{ list }}">{{ list }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="ips-sensor">IPS Sensor</label>
+                <select class="ips-sensor">
+                    <option value="">None</option>
+                    {% for sensor in ips_sensors %}
+                        <option value="{{ sensor }}">{{ sensor }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="logtraffic">Log Traffic</label>
+                <select class="logtraffic">
+                    <option value="all">All</option>
+                    <option value="utm">UTM</option>
+                    <option value="disable">Disable</option>
+                </select>
+
+                <label for="logtraffic-start">Log Traffic Start</label>
+                <select class="logtraffic-start">
+                    <option value="enable">Enable</option>
+                    <option value="disable">Disable</option>
+                </select>
+
+                <label for="auto-asic-offload">Auto ASIC Offload</label>
+                <select class="auto-asic-offload">
+                    <option value="enable">Enable</option>
+                    <option value="disable">Disable</option>
+                </select>
+
+                <label for="nat">NAT</label>
+                <select class="nat">
+                    <option value="disable">Disable</option>
+                    <option value="enable">Enable</option>
+                </select>
+
+                <button type="button" onclick="savePolicy(this)">Save Policy</button>
+                <button type="button" onclick="clearForm(this)">Clear Form</button>
+                <button type="button" onclick="clonePolicy(this)">Clone Policy</button>
+            </form>
+
+            <button class="generate-policies-btn" onclick="generatePolicies()">Generate All Policies</button>
+
+            <div class="output-section">
+                <h2>Generated Policies</h2>
+                <div>
+                    <h3>Output 1: All-in-One Policies</h3>
+                    <pre id="output1"></pre>
+                    <button onclick="copyOutput('output1')">Copy</button>
+                </div>
+                <div>
+                    <h3>Output 2: One Policy Per Service</h3>
+                    <pre id="output2"></pre>
+                    <button onclick="copyOutput('output2')">Copy</button>
+                </div>
+                <div>
+                    <h3>Output 3: Per Src/Dst Interface and Service</h3>
+                    <pre id="output3"></pre>
+                    <button onclick="copyOutput('output3')">Copy</button>
+                </div>
             </div>
         </div>
     </div>
-    <script>
-        // Pass preselected template from server to JavaScript
-        {% if preselected_template %}
-            window.preselectedTemplate = "{{ preselected_template }}";
-        {% else %}
-            window.preselectedTemplate = null;
-        {% endif %}
-        // Handle template file input change
-        document.getElementById('template-file').addEventListener('change', importTemplate);
-    </script>
 </body>
 </html>
