@@ -1,4 +1,4 @@
-/* styles.css (Version 1.5) */
+/* styles.css (Version 1.8) */
 /* Define CSS variables for theming */
 :root {
     --background-color: #f4f7fa; /* Soft gray background */
@@ -21,6 +21,8 @@
     --gradient-end: #e2e8f0;
     --success-color: #4caf50; /* Green for success notifications */
     --error-color: #f44336; /* Red for error notifications */
+    --disabled-bg: #d1d5db; /* Gray for disabled elements */
+    --disabled-text: #6b7280; /* Muted text for disabled elements */
 }
 
 /* Dark mode styles */
@@ -35,6 +37,8 @@
     --gradient-end: #1a202c;
     --success-color: #66bb6a; /* Lighter green for dark mode */
     --error-color: #ef5350; /* Lighter red for dark mode */
+    --disabled-bg: #4b5563; /* Darker gray for disabled elements */
+    --disabled-text: #9ca3af; /* Muted text for disabled elements in dark mode */
 }
 
 /* Reset default margins and ensure full height */
@@ -379,6 +383,12 @@ html, body {
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+.policy-form select:disabled {
+    background-color: var(--disabled-bg);
+    color: var(--disabled-text);
+    cursor: not-allowed;
+}
+
 .policy-name,
 .policy-comment {
     max-width: 100%;
@@ -417,6 +427,34 @@ html, body {
 
 .policy-form button[type="button"][onclick^="add"] {
     margin-bottom: 15px;
+}
+
+/* Style for the field toggle (checkbox + label) - applies to Webfilter Profile, Application List, Antivirus, and IPS Sensor */
+.field-toggle {
+    display: flex;
+    position: relative; /* Ensure the container is not collapsed */
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.field-toggle input[type="checkbox"] {
+    -webkit-appearance: checkbox; /* Ensure checkbox renders on all browsers */
+    -moz-appearance: checkbox;
+    appearance: checkbox;
+    margin-right: 8px;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border-color); /* Fallback border */
+    background-color: var(--background-color); /* Fallback background */
+    accent-color: var(--accent-color); /* Modern browser styling */
+    cursor: pointer;
+}
+
+.field-toggle label {
+    margin-bottom: 0;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-color);
 }
 
 /* Style for Generate All Policies button */

@@ -1,4 +1,4 @@
-# app.py (Version 1.1)
+# app.py (Version 1.4)
 from flask import Flask, request, render_template, jsonify, redirect, send_file
 import json
 import re
@@ -285,6 +285,7 @@ def index(preselected_template=None):
     # Initialize empty lists for profiles and config data
     ssl_ssh_profiles = []
     webfilter_profiles = []
+    av_profiles = []
     application_lists = []
     ips_sensors = []
     interfaces = []
@@ -300,6 +301,7 @@ def index(preselected_template=None):
             config = json.load(f)
             ssl_ssh_profiles = config.get('ssl_ssh_profiles', [])
             webfilter_profiles = config.get('webfilter_profiles', [])
+            av_profiles = config.get('av_profiles', [])
             application_lists = config.get('application_lists', [])
             ips_sensors = config.get('ips_sensors', [])
             interfaces = config.get('interfaces', [])
@@ -317,6 +319,7 @@ def index(preselected_template=None):
         group_templates=SERVICE_GROUP_TEMPLATES,
         ssl_ssh_profiles=ssl_ssh_profiles,
         webfilter_profiles=webfilter_profiles,
+        av_profiles=av_profiles,
         application_lists=application_lists,
         ips_sensors=ips_sensors,
         interfaces=interfaces,
@@ -367,8 +370,13 @@ def save_template():
             'action': policy.get('action', ''),
             'ssl_ssh_profile': policy.get('ssl_ssh_profile', ''),
             'webfilter_profile': policy.get('webfilter_profile', ''),
+            'webfilter_enabled': policy.get('webfilter_enabled', True),
+            'av_profile': policy.get('av_profile', ''),
+            'av_enabled': policy.get('av_enabled', False),
             'application_list': policy.get('application_list', ''),
+            'application_list_enabled': policy.get('application_list_enabled', True),
             'ips_sensor': policy.get('ips_sensor', ''),
+            'ips_sensor_enabled': policy.get('ips_sensor_enabled', True),
             'logtraffic': policy.get('logtraffic', ''),
             'logtraffic_start': policy.get('logtraffic_start', ''),
             'auto_asic_offload': policy.get('auto_asic_offload', ''),
@@ -376,6 +384,9 @@ def save_template():
             'users': policy.get('users', []),
             'groups': policy.get('groups', [])
         }
+        logger.debug(f"Saving policy '{policy_data['policy_name']}': users={policy_data['users']}, groups={policy_data['groups']}, "
+                     f"webfilter_enabled={policy_data['webfilter_enabled']}, application_list_enabled={policy_data['application_list_enabled']}, "
+                     f"av_enabled={policy_data['av_enabled']}, ips_sensor_enabled={policy_data['ips_sensor_enabled']}")
         template_data['policies'].append(policy_data)
 
     try:
@@ -407,14 +418,22 @@ def import_template():
         # Validate template data structure
         required_policy_fields = ['policy_id', 'policy_name', 'policy_comment', 'src_interfaces', 'dst_interfaces',
                                   'src_addresses', 'dst_addresses', 'services', 'action', 'ssl_ssh_profile',
-                                  'webfilter_profile', 'application_list', 'ips_sensor', 'logtraffic',
-                                  'logtraffic_start', 'auto_asic_offload', 'nat', 'users', 'groups']
+                                  'webfilter_profile', 'webfilter_enabled', 'av_profile', 'av_enabled',
+                                  'application_list', 'application_list_enabled', 'ips_sensor', 'ips_sensor_enabled',
+                                  'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat', 'users', 'groups']
         for policy in template_data['policies']:
             for field in required_policy_fields:
                 if field not in policy:
-                    policy[field] = '' if field in ['policy_name', 'policy_comment', 'action', 'ssl_ssh_profile',
-                                                   'webfilter_profile', 'application_list', 'ips_sensor',
-                                                   'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat'] else []
+                    if field in ['webfilter_enabled', 'application_list_enabled', 'ips_sensor_enabled']:
+                        policy[field] = True
+                    elif field == 'av_enabled':
+                        policy[field] = False
+                    elif field in ['policy_name', 'policy_comment', 'action', 'ssl_ssh_profile',
+                                   'webfilter_profile', 'av_profile', 'application_list', 'ips_sensor',
+                                   'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat']:
+                        policy[field] = ''
+                    else:
+                        policy[field] = []
             # Ensure policy_id is unique
             policy['policy_id'] = str(uuid.uuid4())
 
@@ -471,6 +490,7 @@ def get_template(template_name):
             service_groups = {}
             ssl_ssh_profiles = set()
             webfilter_profiles = set()
+            av_profiles = set()
             application_lists = set()
             ips_sensors = set()
             users = set()
@@ -500,6 +520,8 @@ def get_template(template_name):
                     ssl_ssh_profiles.add(policy['ssl_ssh_profile'])
                 if policy.get('webfilter_profile'):
                     webfilter_profiles.add(policy['webfilter_profile'])
+                if policy.get('av_profile'):
+                    av_profiles.add(policy['av_profile'])
                 if policy.get('application_list'):
                     application_lists.add(policy['application_list'])
                 if policy.get('ips_sensor'):
@@ -518,6 +540,7 @@ def get_template(template_name):
                     "service_groups": service_groups,
                     "ssl_ssh_profiles": list(ssl_ssh_profiles),
                     "webfilter_profiles": list(webfilter_profiles),
+                    "av_profiles": list(av_profiles),
                     "application_lists": list(application_lists),
                     "ips_sensors": list(ips_sensors),
                     "users": list(users),
@@ -583,7 +606,7 @@ def rename_template():
 
     # Remove the old template
     templates = [t for t in templates if t['name'] != old_name]
-    # Add the izan template with the new name
+    # Add the renamed template with the new name
     template_to_rename['name'] = new_name
     templates.append(template_to_rename)
 
@@ -650,7 +673,7 @@ def generate_policy():
         logger.error("No policies provided")
         return jsonify({"error": "At least one policy is required"}), 400
 
-    def generate_single_policy(policy_name, policy_comment, src_intfs, dst_intfs, src_addrs, dst_addrs, svc_names, action, ssl_ssh_profile, webfilter_profile, application_list, ips_sensor, logtraffic, logtraffic_start, auto_asic_offload, nat, services, users, groups, include_custom_services=True):
+    def generate_single_policy(policy_name, policy_comment, src_intfs, dst_intfs, src_addrs, dst_addrs, svc_names, action, ssl_ssh_profile, webfilter_profile, av_profile, application_list, ips_sensor, logtraffic, logtraffic_start, auto_asic_offload, nat, services, users, groups, include_custom_services=True):
         if not src_intfs or not dst_intfs or not src_addrs or not dst_addrs or not svc_names:
             logger.warning(f"Skipping policy generation for {policy_name} due to missing required fields")
             return ""
@@ -686,12 +709,14 @@ def generate_policy():
         cli_commands += "set service " + " ".join([f'"{svc}"' for svc in svc_names if svc]) + "\n"
         cli_commands += f'set action {action}\n'
         cli_commands += 'set schedule "always"\n'
-        if ssl_ssh_profile or webfilter_profile or application_list or ips_sensor:
+        if ssl_ssh_profile or webfilter_profile or av_profile or application_list or ips_sensor:
             cli_commands += 'set utm-status enable\n'
         if ssl_ssh_profile:
             cli_commands += f'set ssl-ssh-profile "{ssl_ssh_profile}"\n'
         if webfilter_profile:
             cli_commands += f'set webfilter-profile "{webfilter_profile}"\n'
+        if av_profile:
+            cli_commands += f'set av-profile "{av_profile}"\n'
         if application_list:
             cli_commands += f'set application-list "{application_list}"\n'
         if ips_sensor:
@@ -715,6 +740,7 @@ def generate_policy():
         action = policy.get('action', 'accept')
         ssl_ssh_profile = policy.get('ssl_ssh_profile', '')
         webfilter_profile = policy.get('webfilter_profile', '')
+        av_profile = policy.get('av_profile', '')
         application_list = policy.get('application_list', '')
         ips_sensor = policy.get('ips_sensor', '')
         logtraffic = policy.get('logtraffic', 'all')
@@ -734,6 +760,7 @@ def generate_policy():
         logger.debug(f"Action: {action}")
         logger.debug(f"SSL/SSH Profile: {ssl_ssh_profile}")
         logger.debug(f"Webfilter Profile: {webfilter_profile}")
+        logger.debug(f"Antivirus Profile: {av_profile}")
         logger.debug(f"Application List: {application_list}")
         logger.debug(f"IPS Sensor: {ips_sensor}")
         logger.debug(f"Log Traffic: {logtraffic}")
@@ -765,6 +792,7 @@ def generate_policy():
             action=action,
             ssl_ssh_profile=ssl_ssh_profile,
             webfilter_profile=webfilter_profile,
+            av_profile=av_profile,
             application_list=application_list,
             ips_sensor=ips_sensor,
             logtraffic=logtraffic,
@@ -793,6 +821,7 @@ def generate_policy():
                     action=action,
                     ssl_ssh_profile=ssl_ssh_profile,
                     webfilter_profile=webfilter_profile,
+                    av_profile=av_profile,
                     application_list=application_list,
                     ips_sensor=ips_sensor,
                     logtraffic=logtraffic,
@@ -832,6 +861,7 @@ def generate_policy():
                             action=action,
                             ssl_ssh_profile=ssl_ssh_profile,
                             webfilter_profile=webfilter_profile,
+                            av_profile=av_profile,
                             application_list=application_list,
                             ips_sensor=ips_sensor,
                             logtraffic=logtraffic,
@@ -887,6 +917,7 @@ def parse_config():
     service_groups = {}
     ssl_ssh_profiles = []
     webfilter_profiles = []
+    av_profiles = []
     application_lists = []
     ips_sensors = []
     users = []
@@ -1033,19 +1064,25 @@ def parse_config():
         if profile_name not in ssl_ssh_profiles:
             ssl_ssh_profiles.append(profile_name)
             logger.debug("Found SSL/SSH profile: %s", profile_name)
+    logger.debug("Total SSL/SSH profiles found via regex: %d", len(ssl_ssh_profiles))
 
     # Parse webfilter profiles
-    webfilter_pattern = re.compile(r'config webfilter profile\s+edit\s+"([^"]+)"', re.DOTALL)
-    webfilter_count = 0
+    webfilter_pattern = re.compile(r'config webfilter profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in webfilter_pattern.finditer(content):
         profile_name = match.group(1)
         if profile_name not in webfilter_profiles:
             webfilter_profiles.append(profile_name)
-            webfilter_count += 1
             logger.debug("Found webfilter profile: %s", profile_name)
-    logger.debug("Total webfilter profiles found via regex: %d", webfilter_count)
-    if webfilter_count == 0:
-        logger.debug("No webfilter profiles found via regex in config")
+    logger.debug("Total webfilter profiles found via regex: %d", len(webfilter_profiles))
+
+    # Parse antivirus profiles
+    av_pattern = re.compile(r'config antivirus profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
+    for match in av_pattern.finditer(content):
+        profile_name = match.group(1)
+        if profile_name not in av_profiles:
+            av_profiles.append(profile_name)
+            logger.debug("Found antivirus profile: %s", profile_name)
+    logger.debug("Total antivirus profiles found via regex: %d", len(av_profiles))
 
     # Parse application lists
     application_pattern = re.compile(r'config application list\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
@@ -1054,6 +1091,7 @@ def parse_config():
         if list_name not in application_lists:
             application_lists.append(list_name)
             logger.debug("Found application list: %s", list_name)
+    logger.debug("Total application lists found via regex: %d", len(application_lists))
 
     # Parse IPS sensors
     ips_pattern = re.compile(r'config ips sensor\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
@@ -1062,107 +1100,187 @@ def parse_config():
         if sensor_name not in ips_sensors:
             ips_sensors.append(sensor_name)
             logger.debug("Found IPS sensor: %s", sensor_name)
+    logger.debug("Total IPS sensors found via regex: %d", len(ips_sensors))
 
-    # Fallback line-by-line parsing for profiles, users, and groups
+    # Fallback line-by-line parsing for interfaces, addresses, services, users, groups, and profiles
     lines = content.splitlines()
-    inside_ssl_ssh_section = False
-    inside_webfilter_section = False
-    inside_application_section = False
-    inside_ips_section = False
+    inside_interface_section = False
+    inside_address_section = False
+    inside_addrgrp_section = False
+    inside_service_section = False
+    inside_service_group_section = False
     inside_user_section = False
     inside_group_section = False
-    webfilter_section_ended = False
+    inside_ssl_ssh_section = False
+    inside_webfilter_section = False
+    inside_av_section = False
+    inside_application_section = False
+    inside_ips_section = False
     nested_level = 0
     for i, line in enumerate(lines):
         line = line.strip()
         logger.debug("Processing line %d: %s", i, line)
-        if line.startswith('config firewall ssl-ssh-profile') and not inside_ssl_ssh_section:
-            inside_ssl_ssh_section = True
-            logger.debug("Entered config firewall ssl-ssh-profile section")
+        # Section entry points
+        if line.startswith('config system interface'):
+            inside_interface_section = True
+            logger.debug("Entered config system interface section")
             continue
-        if line.startswith('config webfilter profile') and not inside_webfilter_section:
-            inside_webfilter_section = True
-            webfilter_section_ended = False
-            nested_level = 0
-            logger.debug("Entered config webfilter profile section")
+        if line.startswith('config firewall address'):
+            inside_address_section = True
+            logger.debug("Entered config firewall address section")
             continue
-        if line.startswith('config application list') and not inside_application_section:
-            inside_application_section = True
-            logger.debug("Entered config application list section")
+        if line.startswith('config firewall addrgrp'):
+            inside_addrgrp_section = True
+            logger.debug("Entered config firewall addrgrp section")
             continue
-        if line.startswith('config ips sensor') and not inside_ips_section:
-            inside_ips_section = True
-            logger.debug("Entered config ips sensor section")
+        if line.startswith('config firewall service custom'):
+            inside_service_section = True
+            logger.debug("Entered config firewall service custom section")
             continue
-        if line.startswith('config user local') and not inside_user_section:
+        if line.startswith('config firewall service group'):
+            inside_service_group_section = True
+            logger.debug("Entered config firewall service group section")
+            continue
+        if line.startswith('config user local'):
             inside_user_section = True
             logger.debug("Entered config user local section")
             continue
-        if line.startswith('config user group') and not inside_group_section:
+        if line.startswith('config user group'):
             inside_group_section = True
             logger.debug("Entered config user group section")
             continue
-        if line.startswith('config ') and inside_webfilter_section and webfilter_section_ended:
-            logger.debug("Exiting config webfilter profile section with %d profiles due to new config section", len(webfilter_profiles))
-            inside_webfilter_section = False
-            webfilter_section_ended = False
-            nested_level = 0
+        if line.startswith('config firewall ssl-ssh-profile'):
+            inside_ssl_ssh_section = True
+            logger.debug("Entered config firewall ssl-ssh-profile section")
             continue
+        if line.startswith('config webfilter profile'):
+            inside_webfilter_section = True
+            nested_level = 0
+            logger.debug("Entered config webfilter profile section")
+            continue
+        if line.startswith('config antivirus profile'):
+            inside_av_section = True
+            nested_level = 0
+            logger.debug("Entered config antivirus profile section")
+            continue
+        if line.startswith('config application list'):
+            inside_application_section = True
+            logger.debug("Entered config application list section")
+            continue
+        if line.startswith('config ips sensor'):
+            inside_ips_section = True
+            logger.debug("Entered config ips sensor section")
+            continue
+        # Handle nested config sections
         if line.startswith('config '):
             nested_level += 1
             logger.debug("Entered nested config section, level: %d", nested_level)
             continue
+        # Handle section exits
         if line.startswith('end'):
-            if inside_webfilter_section and nested_level == 0:
-                webfilter_section_ended = True
-                logger.debug("Found end of config webfilter profile section, waiting for new config")
-            elif nested_level > 0:
+            if nested_level > 0:
                 nested_level -= 1
                 logger.debug("Exited nested config section, level: %d", nested_level)
-            elif inside_ssl_ssh_section:
-                inside_ssl_ssh_section = False
-                logger.debug("Exited config firewall ssl-ssh-profile section")
-            elif inside_application_section:
-                inside_application_section = False
-                logger.debug("Exited config application list section")
-            elif inside_ips_section:
-                inside_ips_section = False
-                logger.debug("Exited config ips sensor section")
+            elif inside_interface_section:
+                inside_interface_section = False
+                logger.debug("Exited config system interface section")
+            elif inside_address_section:
+                inside_address_section = False
+                logger.debug("Exited config firewall address section")
+            elif inside_addrgrp_section:
+                inside_addrgrp_section = False
+                logger.debug("Exited config firewall addrgrp section")
+            elif inside_service_section:
+                inside_service_section = False
+                logger.debug("Exited config firewall service custom section")
+            elif inside_service_group_section:
+                inside_service_group_section = False
+                logger.debug("Exited config firewall service group section")
             elif inside_user_section:
                 inside_user_section = False
                 logger.debug("Exited config user local section")
             elif inside_group_section:
                 inside_group_section = False
                 logger.debug("Exited config user group section")
+            elif inside_ssl_ssh_section:
+                inside_ssl_ssh_section = False
+                logger.debug("Exited config firewall ssl-ssh-profile section")
+            elif inside_webfilter_section:
+                inside_webfilter_section = False
+                logger.debug("Exited config webfilter profile section")
+            elif inside_av_section:
+                inside_av_section = False
+                logger.debug("Exited config antivirus profile section")
+            elif inside_application_section:
+                inside_application_section = False
+                logger.debug("Exited config application list section")
+            elif inside_ips_section:
+                inside_ips_section = False
+                logger.debug("Exited config ips sensor section")
             continue
-        if line.startswith('edit ') and (inside_ssl_ssh_section or inside_webfilter_section or inside_application_section or inside_ips_section or inside_user_section or inside_group_section):
+        # Process edit lines within relevant sections
+        if line.startswith('edit ') and (
+            inside_interface_section or
+            inside_address_section or
+            inside_addrgrp_section or
+            inside_service_section or
+            inside_service_group_section or
+            inside_user_section or
+            inside_group_section or
+            inside_ssl_ssh_section or
+            inside_webfilter_section or
+            inside_av_section or
+            inside_application_section or
+            inside_ips_section
+        ):
             logger.debug("Processing edit line: %s", line)
             match = re.match(r'edit\s+"([^"]+)"', line)
             if match:
                 name = match.group(1)
-                if inside_ssl_ssh_section and name not in ssl_ssh_profiles:
-                    ssl_ssh_profiles.append(name)
-                    logger.debug("Found SSL/SSH profile (fallback): %s", name)
-                elif inside_webfilter_section and name not in webfilter_profiles:
-                    webfilter_profiles.append(name)
-                    webfilter_count += 1
-                    logger.debug("Found webfilter profile (fallback): %s", name)
-                elif inside_application_section and name not in application_lists:
-                    application_lists.append(name)
-                    logger.debug("Found application list (fallback): %s", name)
-                elif inside_ips_section and name not in ips_sensors:
-                    ips_sensors.append(name)
-                    logger.debug("Found IPS sensor (fallback): %s", name)
+                if inside_interface_section and name not in interfaces:
+                    interfaces.append(name)
+                    logger.debug("Found interface (fallback): %s", name)
+                elif inside_address_section and name not in addresses:
+                    addresses.append(name)
+                    logger.debug("Found address (fallback): %s", name)
+                elif inside_addrgrp_section and name not in addresses:
+                    addresses.append(name)
+                    logger.debug("Found address group (fallback): %s", name)
                 elif inside_user_section and name not in users:
                     users.append(name)
                     logger.debug("Found user (fallback): %s", name)
                 elif inside_group_section and name not in groups:
                     groups.append(name)
                     logger.debug("Found user group (fallback): %s", name)
+                elif inside_ssl_ssh_section and name not in ssl_ssh_profiles:
+                    ssl_ssh_profiles.append(name)
+                    logger.debug("Found SSL/SSH profile (fallback): %s", name)
+                elif inside_webfilter_section and name not in webfilter_profiles:
+                    webfilter_profiles.append(name)
+                    logger.debug("Found webfilter profile (fallback): %s", name)
+                elif inside_av_section and name not in av_profiles:
+                    av_profiles.append(name)
+                    logger.debug("Found antivirus profile (fallback): %s", name)
+                elif inside_application_section and name not in application_lists:
+                    application_lists.append(name)
+                    logger.debug("Found application list (fallback): %s", name)
+                elif inside_ips_section and name not in ips_sensors:
+                    ips_sensors.append(name)
+                    logger.debug("Found IPS sensor (fallback): %s", name)
             else:
                 logger.debug("Edit line did not match regex: %s", line)
 
+    logger.debug("Final total interfaces found: %d", len(interfaces))
+    logger.debug("Final total addresses found: %d", len(addresses))
+    logger.debug("Final total services found: %d", len(services))
+    logger.debug("Final total service groups found: %d", len(service_groups))
+    logger.debug("Final total users found: %d", len(users))
+    logger.debug("Final total user groups found: %d", len(groups))
+    logger.debug("Final total SSL/SSH profiles found: %d", len(ssl_ssh_profiles))
     logger.debug("Final total webfilter profiles found: %d", len(webfilter_profiles))
+    logger.debug("Final total antivirus profiles found: %d", len(av_profiles))
+    logger.debug("Final total application lists found: %d", len(application_lists))
+    logger.debug("Final total IPS sensors found: %d", len(ips_sensors))
 
     response = {
         "interfaces": interfaces,
@@ -1171,6 +1289,7 @@ def parse_config():
         "service_groups": service_groups,
         "ssl_ssh_profiles": ssl_ssh_profiles,
         "webfilter_profiles": webfilter_profiles,
+        "av_profiles": av_profiles,
         "application_lists": application_lists,
         "ips_sensors": ips_sensors,
         "users": users,

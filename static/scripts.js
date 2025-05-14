@@ -1,4 +1,4 @@
-// scripts.js (Version 1.5)
+// scripts.js (Version 1.8)
 let policies = [];
 let interfaces = [];
 let addresses = [];
@@ -7,6 +7,7 @@ let serviceGroups = {};
 let sslSshProfiles = [];
 let webfilterProfiles = [];
 let applicationLists = [];
+let avProfiles = [];
 let ipsSensors = [];
 let users = [];
 let groups = [];
@@ -48,8 +49,13 @@ function addPolicy() {
         action: 'accept',
         ssl_ssh_profile: '',
         webfilter_profile: '',
+        webfilter_enabled: true,
         application_list: '',
+        application_list_enabled: true,
+        av_profile: '',
+        av_enabled: false,
         ips_sensor: '',
+        ips_sensor_enabled: true,
         logtraffic: 'all',
         logtraffic_start: 'enable',
         auto_asic_offload: 'enable',
@@ -99,9 +105,35 @@ function selectPolicy(policyId) {
         form.querySelector('.policy-comment').value = policy.comment || '';
         form.querySelector('.action').value = policy.action || 'accept';
         form.querySelector('.ssl-ssh-profile').value = policy.ssl_ssh_profile || '';
-        form.querySelector('.webfilter-profile').value = policy.webfilter_profile || '';
-        form.querySelector('.application-list').value = policy.application_list || '';
-        form.querySelector('.ips-sensor').value = policy.ips_sensor || '';
+        
+        // Webfilter Profile
+        const webfilterCheckbox = form.querySelector('.toggle-field[data-field="webfilter-profile"]');
+        const webfilterSelect = form.querySelector('.webfilter-profile');
+        webfilterCheckbox.checked = policy.webfilter_enabled;
+        webfilterSelect.disabled = !policy.webfilter_enabled;
+        webfilterSelect.value = policy.webfilter_enabled ? (policy.webfilter_profile || '') : '';
+        
+        // Application List
+        const appListCheckbox = form.querySelector('.toggle-field[data-field="application-list"]');
+        const appListSelect = form.querySelector('.application-list');
+        appListCheckbox.checked = policy.application_list_enabled;
+        appListSelect.disabled = !policy.application_list_enabled;
+        appListSelect.value = policy.application_list_enabled ? (policy.application_list || '') : '';
+
+        // Antivirus
+        const avCheckbox = form.querySelector('.toggle-field[data-field="av-profile"]');
+        const avSelect = form.querySelector('.av-profile');
+        avCheckbox.checked = policy.av_enabled;
+        avSelect.disabled = !policy.av_enabled;
+        avSelect.value = policy.av_enabled ? (policy.av_profile || '') : '';
+        
+        // IPS Sensor
+        const ipsSensorCheckbox = form.querySelector('.toggle-field[data-field="ips-sensor"]');
+        const ipsSensorSelect = form.querySelector('.ips-sensor');
+        ipsSensorCheckbox.checked = policy.ips_sensor_enabled;
+        ipsSensorSelect.disabled = !policy.ips_sensor_enabled;
+        ipsSensorSelect.value = policy.ips_sensor_enabled ? (policy.ips_sensor || '') : '';
+
         form.querySelector('.logtraffic').value = policy.logtraffic || 'all';
         form.querySelector('.logtraffic-start').value = policy.logtraffic_start || 'enable';
         form.querySelector('.auto-asic-offload').value = policy.auto_asic_offload || 'enable';
@@ -230,9 +262,10 @@ function updateDropdowns() {
     const sslSshSelect = form.querySelector('.ssl-ssh-profile');
     const webfilterSelect = form.querySelector('.webfilter-profile');
     const appListSelect = form.querySelector('.application-list');
+    const avSelect = form.querySelector('.av-profile');
     const ipsSensorSelect = form.querySelector('.ips-sensor');
 
-    if (!sslSshSelect || !webfilterSelect || !appListSelect || !ipsSensorSelect) {
+    if (!sslSshSelect || !webfilterSelect || !appListSelect || !avSelect || !ipsSensorSelect) {
         console.error('One or more dropdown elements not found');
         return;
     }
@@ -240,6 +273,7 @@ function updateDropdowns() {
     sslSshSelect.innerHTML = `<option value="">None</option>${sslSshProfiles.map(p => `<option value="${p}">${p}</option>`).join('')}`;
     webfilterSelect.innerHTML = `<option value="">None</option>${webfilterProfiles.map(p => `<option value="${p}">${p}</option>`).join('')}`;
     appListSelect.innerHTML = `<option value="">None</option>${applicationLists.map(l => `<option value="${l}">${l}</option>`).join('')}`;
+    avSelect.innerHTML = `<option value="">None</option>${avProfiles.map(p => `<option value="${p}">${p}</option>`).join('')}`;
     ipsSensorSelect.innerHTML = `<option value="">None</option>${ipsSensors.map(s => `<option value="${s}">${s}</option>`).join('')}`;
 
     const policyId = form.dataset.policyId;
@@ -556,9 +590,14 @@ function savePolicy(button) {
         const policyComment = form.querySelector('.policy-comment')?.value || '';
         const action = form.querySelector('.action')?.value || 'accept';
         const sslSshProfile = form.querySelector('.ssl-ssh-profile')?.value || '';
-        const webfilterProfile = form.querySelector('.webfilter-profile')?.value || '';
-        const applicationList = form.querySelector('.application-list')?.value || '';
-        const ipsSensor = form.querySelector('.ips-sensor')?.value || '';
+        const webfilterProfile = form.querySelector('.webfilter-profile');
+        const webfilterEnabled = form.querySelector('.toggle-field[data-field="webfilter-profile"]').checked;
+        const applicationList = form.querySelector('.application-list');
+        const applicationListEnabled = form.querySelector('.toggle-field[data-field="application-list"]').checked;
+        const avProfile = form.querySelector('.av-profile');
+        const avEnabled = form.querySelector('.toggle-field[data-field="av-profile"]').checked;
+        const ipsSensor = form.querySelector('.ips-sensor');
+        const ipsSensorEnabled = form.querySelector('.toggle-field[data-field="ips-sensor"]').checked;
         const logtraffic = form.querySelector('.logtraffic')?.value || 'all';
         const logtrafficStart = form.querySelector('.logtraffic-start')?.value || 'enable';
         const autoAsicOffload = form.querySelector('.auto-asic-offload')?.value || 'enable';
@@ -569,9 +608,14 @@ function savePolicy(button) {
             policyComment,
             action,
             sslSshProfile,
-            webfilterProfile,
-            applicationList,
-            ipsSensor,
+            webfilterProfile: webfilterProfile.value,
+            webfilterEnabled,
+            applicationList: applicationList.value,
+            applicationListEnabled,
+            avProfile: avProfile.value,
+            avEnabled,
+            ipsSensor: ipsSensor.value,
+            ipsSensorEnabled,
             logtraffic,
             logtrafficStart,
             autoAsicOffload,
@@ -583,9 +627,14 @@ function savePolicy(button) {
         policy.comment = policyComment;
         policy.action = action;
         policy.ssl_ssh_profile = sslSshProfile;
-        policy.webfilter_profile = webfilterProfile;
-        policy.application_list = applicationList;
-        policy.ips_sensor = ipsSensor;
+        policy.webfilter_enabled = webfilterEnabled;
+        policy.webfilter_profile = webfilterEnabled ? webfilterProfile.value : '';
+        policy.application_list_enabled = applicationListEnabled;
+        policy.application_list = applicationListEnabled ? applicationList.value : '';
+        policy.av_enabled = avEnabled;
+        policy.av_profile = avEnabled ? avProfile.value : '';
+        policy.ips_sensor_enabled = ipsSensorEnabled;
+        policy.ips_sensor = ipsSensorEnabled ? ipsSensor.value : '';
         policy.logtraffic = logtraffic;
         policy.logtraffic_start = logtrafficStart;
         policy.auto_asic_offload = autoAsicOffload;
@@ -630,8 +679,13 @@ function clonePolicy(button) {
                 action: data.new_policy.action,
                 ssl_ssh_profile: data.new_policy.ssl_ssh_profile,
                 webfilter_profile: data.new_policy.webfilter_profile,
+                webfilter_enabled: data.new_policy.webfilter_enabled,
                 application_list: data.new_policy.application_list,
+                application_list_enabled: data.new_policy.application_list_enabled,
+                av_profile: data.new_policy.av_profile,
+                av_enabled: data.new_policy.av_enabled,
                 ips_sensor: data.new_policy.ips_sensor,
+                ips_sensor_enabled: data.new_policy.ips_sensor_enabled,
                 logtraffic: data.new_policy.logtraffic,
                 logtraffic_start: data.new_policy.logtraffic_start,
                 auto_asic_offload: data.new_policy.auto_asic_offload,
@@ -663,9 +717,35 @@ function clearForm(button) {
     form.querySelector('.policy-comment').value = '';
     form.querySelector('.action').value = 'accept';
     form.querySelector('.ssl-ssh-profile').value = '';
-    form.querySelector('.webfilter-profile').value = '';
-    form.querySelector('.application-list').value = '';
-    form.querySelector('.ips-sensor').value = '';
+    
+    // Reset Webfilter Profile
+    const webfilterCheckbox = form.querySelector('.toggle-field[data-field="webfilter-profile"]');
+    const webfilterSelect = form.querySelector('.webfilter-profile');
+    webfilterCheckbox.checked = true;
+    webfilterSelect.disabled = false;
+    webfilterSelect.value = '';
+    
+    // Reset Application List
+    const appListCheckbox = form.querySelector('.toggle-field[data-field="application-list"]');
+    const appListSelect = form.querySelector('.application-list');
+    appListCheckbox.checked = true;
+    appListSelect.disabled = false;
+    appListSelect.value = '';
+
+    // Reset Antivirus
+    const avCheckbox = form.querySelector('.toggle-field[data-field="av-profile"]');
+    const avSelect = form.querySelector('.av-profile');
+    avCheckbox.checked = false;
+    avSelect.disabled = true;
+    avSelect.value = '';
+    
+    // Reset IPS Sensor
+    const ipsSensorCheckbox = form.querySelector('.toggle-field[data-field="ips-sensor"]');
+    const ipsSensorSelect = form.querySelector('.ips-sensor');
+    ipsSensorCheckbox.checked = true;
+    ipsSensorSelect.disabled = false;
+    ipsSensorSelect.value = '';
+
     form.querySelector('.logtraffic').value = 'all';
     form.querySelector('.logtraffic-start').value = 'enable';
     form.querySelector('.auto-asic-offload').value = 'enable';
@@ -687,6 +767,14 @@ function clearForm(button) {
         policy.services = [];
         policy.users = [];
         policy.groups = [];
+        policy.webfilter_enabled = true;
+        policy.webfilter_profile = '';
+        policy.application_list_enabled = true;
+        policy.application_list = '';
+        policy.av_enabled = false;
+        policy.av_profile = '';
+        policy.ips_sensor_enabled = true;
+        policy.ips_sensor = '';
     }
 }
 
@@ -710,9 +798,14 @@ function saveTemplate() {
         services: p.services,
         action: p.action,
         ssl_ssh_profile: p.ssl_ssh_profile,
-        webfilter_profile: p.webfilter_profile,
-        application_list: p.application_list,
-        ips_sensor: p.ips_sensor,
+        webfilter_profile: p.webfilter_enabled ? p.webfilter_profile : '',
+        webfilter_enabled: p.webfilter_enabled,
+        application_list: p.application_list_enabled ? p.application_list : '',
+        application_list_enabled: p.application_list_enabled,
+        av_profile: p.av_enabled ? p.av_profile : '',
+        av_enabled: p.av_enabled,
+        ips_sensor: p.ips_sensor_enabled ? p.ips_sensor : '',
+        ips_sensor_enabled: p.ips_sensor_enabled,
         logtraffic: p.logtraffic,
         logtraffic_start: p.logtraffic_start,
         auto_asic_offload: p.auto_asic_offload,
@@ -787,8 +880,13 @@ function loadTemplate() {
                 action: p.action,
                 ssl_ssh_profile: p.ssl_ssh_profile,
                 webfilter_profile: p.webfilter_profile,
+                webfilter_enabled: p.webfilter_enabled !== undefined ? p.webfilter_enabled : true,
                 application_list: p.application_list,
+                application_list_enabled: p.application_list_enabled !== undefined ? p.application_list_enabled : true,
+                av_profile: p.av_profile,
+                av_enabled: p.av_enabled !== undefined ? p.av_enabled : false,
                 ips_sensor: p.ips_sensor,
+                ips_sensor_enabled: p.ips_sensor_enabled !== undefined ? p.ips_sensor_enabled : true,
                 logtraffic: p.logtraffic,
                 logtraffic_start: p.logtraffic_start,
                 auto_asic_offload: p.auto_asic_offload,
@@ -805,13 +903,14 @@ function loadTemplate() {
             sslSshProfiles = data.config.ssl_ssh_profiles || [];
             webfilterProfiles = data.config.webfilter_profiles || [];
             applicationLists = data.config.application_lists || [];
+            avProfiles = data.config.av_profiles || [];
             ipsSensors = data.config.ips_sensors || [];
             users = data.config.users || [];
             groups = data.config.groups || [];
 
             // Merge with existing config data if available
             try {
-                fetch('/parse_config', { method: 'GET' })
+                fetch('/parse_config', { method: 'POST', body: new FormData() })
                     .then(res => res.json())
                     .then(config => {
                         interfaces = [...new Set([...interfaces, ...(config.interfaces || [])])];
@@ -821,6 +920,7 @@ function loadTemplate() {
                         sslSshProfiles = [...new Set([...sslSshProfiles, ...(config.ssl_ssh_profiles || [])])];
                         webfilterProfiles = [...new Set([...webfilterProfiles, ...(config.webfilter_profiles || [])])];
                         applicationLists = [...new Set([...applicationLists, ...(config.application_lists || [])])];
+                        avProfiles = [...new Set([...avProfiles, ...(config.av_profiles || [])])];
                         ipsSensors = [...new Set([...ipsSensors, ...(config.ips_sensors || [])])];
                         users = [...new Set([...users, ...(config.users || [])])];
                         groups = [...new Set([...groups, ...(config.groups || [])])];
@@ -1137,6 +1237,7 @@ function importConfig() {
         sslSshProfiles = data.ssl_ssh_profiles || [];
         webfilterProfiles = data.webfilter_profiles || [];
         applicationLists = data.application_lists || [];
+        avProfiles = data.av_profiles || [];
         ipsSensors = data.ips_sensors || [];
         users = data.users || [];
         groups = data.groups || [];
@@ -1172,9 +1273,14 @@ function generatePolicies() {
         services: p.services,
         action: p.action,
         ssl_ssh_profile: p.ssl_ssh_profile,
-        webfilter_profile: p.webfilter_profile,
-        application_list: p.application_list,
-        ips_sensor: p.ips_sensor,
+        webfilter_profile: p.webfilter_enabled ? p.webfilter_profile : '',
+        webfilter_enabled: p.webfilter_enabled,
+        application_list: p.application_list_enabled ? p.application_list : '',
+        application_list_enabled: p.application_list_enabled,
+        av_profile: p.av_enabled ? p.av_profile : '',
+        av_enabled: p.av_enabled,
+        ips_sensor: p.ips_sensor_enabled ? p.ips_sensor : '',
+        ips_sensor_enabled: p.ips_sensor_enabled,
         logtraffic: p.logtraffic,
         logtraffic_start: p.logtraffic_start,
         auto_asic_offload: p.auto_asic_offload,
@@ -1249,7 +1355,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const toggleButton = document.getElementById('theme-toggle');
     toggleButton.textContent = savedTheme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
     toggleButton.setAttribute('aria-label', `Toggle ${savedTheme === 'dark' ? 'light' : 'dark'} mode`);
-    toggleButton.addEventListener('click', toggleTheme); // Attach the event listener
+    toggleButton.addEventListener('click', toggleTheme);
+
+    // Add event listeners for toggle checkboxes
+    const form = document.getElementById('policy-form');
+    if (form) {
+        const toggleCheckboxes = form.querySelectorAll('.toggle-field');
+        toggleCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const field = e.target.dataset.field;
+                const select = form.querySelector(`.${field}`);
+                select.disabled = !e.target.checked;
+
+                const policyId = form.dataset.policyId;
+                const policy = policies.find(p => p.id === policyId);
+                if (policy) {
+                    policy[`${field}_enabled`] = e.target.checked;
+                    if (!e.target.checked) {
+                        policy[field] = ''; // Clear the value if disabled
+                    }
+                }
+            });
+        });
+    }
 
     loadTemplateList();
     // Only add a new policy if no pre-selected template is provided
