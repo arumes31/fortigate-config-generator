@@ -1,44 +1,52 @@
-/* styles.css (Version 1.10) */
+/* styles.css (Version 1.20) */
 /* Define CSS variables for theming */
 :root {
-    --background-color: #f4f7fa; /* Soft gray background */
-    --card-background: #ffffff; /* White cards */
-    --text-color: #2d3748; /* Dark gray text */
-    --text-secondary: #4a5568; /* Lighter gray for secondary text */
-    --accent-color: #26a69a; /* Teal accent for buttons and highlights */
-    --accent-hover: #2c7a7b; /* Darker teal for hover */
-    --border-color: #e2e8f0; /* Light gray borders */
+    --background-color: #E6E9EF; /* Light blue-gray background for light mode */
+    --card-background: #FFFFFF; /* White cards for contrast */
+    --text-color: #1C2526; /* Deep blue text */
+    --text-secondary: #4A5E7A; /* Lighter blue for secondary text */
+    --accent-color: #3B82F6; /* Vibrant blue accent */
+    --accent-hover: #6366F1; /* Indigo for hover */
+    --border-color: #D1D5DB; /* Light gray borders */
     --shadow-color: rgba(0, 0, 0, 0.1);
-    --button-gradient-start: #26a69a;
-    --button-gradient-end: #2c7a7b;
-    --delete-button-start: #f44336;
-    --delete-button-end: #d32f2f;
-    --clone-button-start: #42a5f5; /* Blue for clone button */
-    --clone-button-end: #1e88e5; /* Darker blue for clone button hover */
-    --copy-button-start: #42a5f5;
-    --copy-button-end: #1e88e5;
-    --gradient-start: #f4f7fa;
-    --gradient-end: #e2e8f0;
-    --success-color: #4caf50; /* Green for success notifications */
-    --error-color: #f44336; /* Red for error notifications */
-    --disabled-bg: #d1d5db; /* Gray for disabled elements */
-    --disabled-text: #6b7280; /* Muted text for disabled elements */
+    --button-gradient-start: #3B82F6; /* Blue for button gradient start */
+    --button-gradient-end: #6366F1; /* Indigo for button gradient end */
+    --delete-button-start: #F87171; /* Light red for delete buttons */
+    --delete-button-end: #EF4444; /* Red for delete hover */
+    --clone-button-start: #A3E635; /* Lime green for clone button gradient start */
+    --clone-button-end: #4ADE80; /* Green for clone button gradient end */
+    --copy-button-start: #3B82F6; /* Blue for copy button gradient start */
+    --copy-button-end: #6366F1; /* Indigo for copy button gradient end */
+    --gradient-start: #60A5FA; /* Light blue for sidebar gradient start */
+    --gradient-end: #3B82F6; /* Vibrant blue for sidebar gradient end */
+    --success-color: #5CB85C; /* Green for success notifications */
+    --error-color: #EF4444; /* Red for error notifications */
+    --disabled-bg: #D1D5DB; /* Gray for disabled elements */
+    --disabled-text: #6B7280; /* Muted text for disabled elements */
 }
 
 /* Dark mode styles */
 [data-theme="dark"] {
-    --background-color: #1a202c; /* Dark background */
-    --card-background: #2d3748; /* Dark gray cards */
-    --text-color: #ffffff; /* Pure white text for better contrast */
-    --text-secondary: #a0aec0; /* Lighter gray for secondary text */
-    --border-color: #4a5568; /* Darker gray borders */
+    --background-color: #1C2526; /* Deep blue background for dark mode */
+    --card-background: #2A3435; /* Slightly lighter deep blue for cards */
+    --text-color: #FFFFFF; /* White text for contrast */
+    --text-secondary: #A0AEC0; /* Light gray for secondary text */
+    --border-color: #4A5E7A; /* Lighter blue for borders */
     --shadow-color: rgba(0, 0, 0, 0.3);
-    --gradient-start: #2d3748;
-    --gradient-end: #1a202c;
-    --success-color: #66bb6a; /* Lighter green for dark mode */
-    --error-color: #ef5350; /* Lighter red for dark mode */
-    --disabled-bg: #4b5563; /* Darker gray for disabled elements */
-    --disabled-text: #9ca3af; /* Muted text for disabled elements in dark mode */
+    --gradient-start: #1E40AF; /* Dark blue for sidebar in dark mode */
+    --gradient-end: #1E293B; /* Dark slate for sidebar gradient */
+    --button-gradient-start: #8B5CF6; /* Soft purple for buttons in dark mode */
+    --button-gradient-end: #3B82F6; /* Vibrant blue for button gradient in dark mode */
+    --delete-button-start: #F87171; /* Light red for delete buttons in dark mode */
+    --delete-button-end: #DC2626; /* Deeper red for delete button hover */
+    --clone-button-start: #4ADE80; /* Green for clone button in dark mode */
+    --clone-button-end: #16A34A; /* Deeper green for clone button in dark mode */
+    --copy-button-start: #8B5CF6; /* Soft purple for copy button in dark mode */
+    --copy-button-end: #3B82F6; /* Vibrant blue for copy button in dark mode */
+    --success-color: #66BB6A; /* Lighter green for dark mode */
+    --error-color: #DC2626; /* Deeper red for dark mode */
+    --disabled-bg: #4A5E7A; /* Lighter blue for disabled elements */
+    --disabled-text: #A0AEC0; /* Light gray for disabled text */
 }
 
 /* Reset default margins and ensure full height */
@@ -115,11 +123,19 @@ html, body {
     animation: fadeIn 0.5s ease-in;
 }
 
+.sidebar-logo {
+    width: 100%;
+    max-width: 260px; /* Slightly less than sidebar width to account for padding */
+    height: auto;
+    margin-bottom: 15px;
+    display: block;
+}
+
 .sidebar h2 {
     margin-top: 0;
     font-size: 1.8rem;
     font-weight: 600;
-    color: var(--accent-color);
+    color: #1C2526; /* Dark blue as requested */
     margin-bottom: 15px;
     line-height: 1.2;
 }
@@ -146,7 +162,7 @@ html, body {
 
 #theme-toggle:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }
 
 .sidebar h3 {
@@ -183,7 +199,7 @@ html, body {
 .template-section select:focus,
 .template-section input[type="text"]:focus {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(38, 166, 154, 0.2);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     outline: none;
 }
 
@@ -212,7 +228,7 @@ html, body {
 .template-section button:focus,
 .sidebar button:not(.clone-btn):not(.delete-btn):focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }
 
 #policy-list {
@@ -257,19 +273,20 @@ html, body {
 }
 
 .policy-item .delete-btn:hover {
-    background: linear-gradient(to bottom, var(--delete-button-end), #b71c1c);
+    background: linear-gradient(to bottom, var(--delete-button-end), #DC2626);
     transform: scale(1.03);
 }
 
 .policy-item .delete-btn:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.3);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
 }
 
 .policy-item .clone-btn {
     padding: 4px 8px;
     margin-left: 4px;
     font-size: 0.8rem;
+    font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
     background: linear-gradient(to bottom, var(--clone-button-start), var(--clone-button-end));
     color: white;
     border: none;
@@ -279,13 +296,13 @@ html, body {
 }
 
 .policy-item .clone-btn:hover {
-    background: linear-gradient(to bottom, var(--clone-button-end), #1565c0);
+    background: linear-gradient(to bottom, var(--clone-button-end), #16A34A);
     transform: scale(1.03);
 }
 
 .policy-item .clone-btn:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.3);
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.3);
 }
 
 .main-content {
@@ -358,7 +375,7 @@ html, body {
 
 .config-section button:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }
 
 .policy-form label {
@@ -398,7 +415,7 @@ html, body {
 .policy-form input[type="text"]:focus,
 .policy-form select:focus {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(38, 166, 154, 0.2);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     outline: none;
 }
 
@@ -423,7 +440,7 @@ html, body {
 
 .policy-form button:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }
 
 .policy-form button[type="button"][onclick^="add"] {
@@ -486,7 +503,7 @@ html, body {
 
 .ip-pool-section select:focus {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(38, 166, 154, 0.2);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     outline: none;
 }
 
@@ -518,7 +535,7 @@ html, body {
 
 .generate-policies-btn:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(38, 166, 154, 0.3);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }
 
 /* Two-column layout */
@@ -626,7 +643,7 @@ html, body {
 .address-item button:hover,
 .service-item button:hover,
 .user-group-item button:hover {
-    background: linear-gradient(to bottom, var(--delete-button-end), #b71c1c);
+    background: linear-gradient(to bottom, var(--delete-button-end), #DC2626);
     transform: scale(1.03);
 }
 
@@ -635,7 +652,7 @@ html, body {
 .service-item button:focus,
 .user-group-item button:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.3);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
 }
 
 .output-section > div {
@@ -676,14 +693,14 @@ html, body {
 }
 
 .output-section button:hover {
-    background: linear-gradient(to bottom, var(--copy-button-end), #1565c0);
+    background: linear-gradient(to bottom, var(--copy-button-end), var(--accent-hover));
     transform: scale(1.03);
     box-shadow: 0 2px 8px var(--shadow-color);
 }
 
 .output-section button:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.3);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }
 
 /* Responsive design: stack columns on smaller screens */
@@ -738,7 +755,7 @@ html, body {
 
 .searchable-select-input:focus {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(38, 166, 154, 0.2);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     outline: none;
 }
 

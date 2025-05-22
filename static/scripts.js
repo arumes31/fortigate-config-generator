@@ -1701,22 +1701,55 @@ function copyOutput(outputId) {
 
 function toggleTheme() {
     const html = document.documentElement;
-    const currentTheme = html.getAttribute('data-theme');
+    const logo = document.querySelector('.sidebar-logo');
+    const currentTheme = html.getAttribute('data-theme') || 'light';
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
     html.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
+    
     const toggleButton = document.getElementById('theme-toggle');
     toggleButton.textContent = newTheme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
     toggleButton.setAttribute('aria-label', `Toggle ${newTheme === 'dark' ? 'light' : 'dark'} mode`);
+    
+    // Switch logo based on theme with cache-busting
+    if (logo) {
+        const cacheBuster = `?v=${Date.now()}`;
+        const newSrc = (newTheme === 'dark' ? logo.getAttribute('data-dark-src') : logo.getAttribute('data-light-src')) + cacheBuster;
+        console.log(`Switching logo to: ${newSrc}`);
+        logToBackend(`Switching logo to: ${newSrc}`);
+        logo.src = newSrc;
+    }
+    
     logToBackend(`Theme toggled to: ${newTheme}`);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
+    // Determine initial theme
+    let initialTheme = localStorage.getItem('theme');
+    if (!initialTheme) {
+        initialTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        localStorage.setItem('theme', initialTheme);
+    }
+    
+    // Apply initial theme and logo
+    const html = document.documentElement;
+    const logo = document.querySelector('.sidebar-logo');
+    html.setAttribute('data-theme', initialTheme);
+    
     const toggleButton = document.getElementById('theme-toggle');
-    toggleButton.textContent = savedTheme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
-    toggleButton.setAttribute('aria-label', `Toggle ${savedTheme === 'dark' ? 'light' : 'dark'} mode`);
+    toggleButton.textContent = initialTheme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
+    toggleButton.setAttribute('aria-label', `Toggle ${initialTheme === 'dark' ? 'light' : 'dark'} mode`);
+    
+    // Set initial logo based on theme with cache-busting
+    if (logo) {
+        const cacheBuster = `?v=${Date.now()}`;
+        const initialSrc = (initialTheme === 'dark' ? logo.getAttribute('data-dark-src') : logo.getAttribute('data-light-src')) + cacheBuster;
+        console.log(`Setting initial logo to: ${initialSrc}`);
+        logToBackend(`Setting initial logo to: ${initialSrc}`);
+        logo.src = initialSrc;
+    }
+    
     toggleButton.addEventListener('click', toggleTheme);
 
     const form = document.getElementById('policy-form');

@@ -24,7 +24,7 @@
 <body>
     <div class="container">
         <div class="sidebar">
-            <h2>FGT Policy Generator</h2>
+            <img class="sidebar-logo" src="/static/logo-white.png" data-light-src="/static/logo-white.png" data-dark-src="/static/logo-dark.png" alt="Logo" onerror="console.error('Logo failed to load:', this.src); logToBackend('Logo failed to load: ' + this.src)" onload="console.log('Logo loaded successfully:', this.src); logToBackend('Logo loaded successfully: ' + this.src)">
             <button id="theme-toggle" aria-label="Toggle dark mode">🌙 Dark Mode</button>
             <div class="template-section">
                 <h3>Load Template</h3>
@@ -52,7 +52,6 @@
             <button onclick="addPolicy()">Add Policy</button>
         </div>
         <div class="main-content">
-            <h1>Policy Configuration</h1>
             <div class="config-section">
                 <h2>Import FortiGate Config</h2>
                 <input type="file" id="config-file">
