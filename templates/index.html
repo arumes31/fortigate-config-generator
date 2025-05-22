@@ -1,6 +1,6 @@
 {% raw %}
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,8 +12,8 @@
         <div class="sidebar">
             <h2>FGT Policy Generator</h2>
             <button id="theme-toggle" aria-label="Toggle dark mode">🌙 Dark Mode</button>
+            <h3>Load Template</h3>
             <div class="template-section">
-                <h3>Load Template</h3>
                 <select id="template-select">
                     <option value="">Select Template</option>
                     {% for template in templates %}
@@ -29,8 +29,8 @@
                 <button onclick="deleteTemplate()">Delete</button>
                 <button onclick="renameTemplate()">Rename</button>
                 <button onclick="exportTemplate()">Export</button>
-                <input type="file" id="template-file-import" accept=".json" style="display: none;" onchange="importTemplate(event)">
-                <button onclick="document.getElementById('template-file-import').click();">Import</button>
+                <input type="file" id="import-template" accept=".json" onchange="importTemplate(event)" style="display: none;">
+                <button onclick="document.getElementById('import-template').click()">Import Template</button>
             </div>
             <h3>Policies</h3>
             <div id="policy-list"></div>
@@ -38,20 +38,21 @@
         </div>
         <div class="main-content">
             <h1>FGT Policy Generator</h1>
-            <div id="notification-container"></div>
             <div class="config-section">
                 <h2>Import FortiGate Config</h2>
-                <input type="file" id="config-file">
+                <input type="file" id="config-file" accept=".conf">
                 <button onclick="importConfig()">Import Config</button>
             </div>
-            <div class="policy-form" id="policy-form">
+            <form id="policy-form" class="policy-form">
                 <h2>Policy Configuration</h2>
                 <div class="form-row">
                     <div class="form-column-left">
-                        <label>Policy Name</label>
+                        <label for="policy-name">Policy Name</label>
                         <input type="text" class="policy-name" placeholder="Policy Name">
-                        <label>Policy Comment</label>
+                        <label for="policy-comment">Policy Comment</label>
                         <input type="text" class="policy-comment" placeholder="Policy Comment">
+                    </div>
+                    <div class="form-column-right">
                     </div>
                 </div>
                 <div class="form-row">
@@ -62,9 +63,9 @@
                             <button type="button" onclick="addSrcInterface(this)">+ Add Source Interface</button>
                         </div>
                         <div class="src-addresses">
-                            <label>Source Addresses</label>
+                            <label>Source Addresses/ISDB</label>
                             <div class="address-items"></div>
-                            <button type="button" onclick="addSrcAddress(this)">+ Add Source Address</button>
+                            <button type="button" onclick="addSrcAddress(this)">+ Add Source Address/ISDB</button>
                         </div>
                         <div class="src-users-groups">
                             <label>Users/Groups</label>
@@ -79,9 +80,9 @@
                             <button type="button" onclick="addDstInterface(this)">+ Add Destination Interface</button>
                         </div>
                         <div class="dst-addresses">
-                            <label>Destination Addresses</label>
+                            <label>Destination Addresses/ISDB</label>
                             <div class="address-items"></div>
-                            <button type="button" onclick="addDstAddress(this)">+ Add Destination Address</button>
+                            <button type="button" onclick="addDstAddress(this)">+ Add Destination Address/ISDB</button>
                         </div>
                     </div>
                 </div>
@@ -90,12 +91,23 @@
                     <div class="service-items"></div>
                     <button type="button" onclick="addService(this)">+ Add Service/Group</button>
                 </div>
-                <label>Action</label>
-                <select class="action">
-                    <option value="accept">Accept</option>
-                    <option value="deny">Deny</option>
-                </select>
-                <label>SSL/SSH Profile</label>
+                <div class="form-row">
+                    <div class="form-column-left">
+                        <label for="action">Action</label>
+                        <select class="action" onchange="toggleProfileFields(this)">
+                            <option value="accept">Accept</option>
+                            <option value="deny">Deny</option>
+                        </select>
+                    </div>
+                    <div class="form-column-right">
+                        <label for="inspection-mode">Inspection Mode</label>
+                        <select class="inspection-mode">
+                            <option value="flow">Flow-based</option>
+                            <option value="proxy">Proxy-based</option>
+                        </select>
+                    </div>
+                </div>
+                <label for="ssl-ssh-profile">SSL/SSH Profile</label>
                 <select class="ssl-ssh-profile">
                     <option value="">None</option>
                     {% for profile in ssl_ssh_profiles %}
@@ -104,7 +116,7 @@
                 </select>
                 <div class="field-toggle">
                     <input type="checkbox" class="toggle-field" data-field="webfilter-profile" checked>
-                    <label>Webfilter Profile</label>
+                    <label for="webfilter-profile">Webfilter Profile</label>
                 </div>
                 <select class="webfilter-profile">
                     <option value="">None</option>
@@ -114,7 +126,7 @@
                 </select>
                 <div class="field-toggle">
                     <input type="checkbox" class="toggle-field" data-field="application-list" checked>
-                    <label>Application List</label>
+                    <label for="application-list">Application List</label>
                 </div>
                 <select class="application-list">
                     <option value="">None</option>
@@ -124,7 +136,7 @@
                 </select>
                 <div class="field-toggle">
                     <input type="checkbox" class="toggle-field" data-field="av-profile">
-                    <label>Antivirus</label>
+                    <label for="av-profile">Antivirus</label>
                 </div>
                 <select class="av-profile" disabled>
                     <option value="">None</option>
@@ -134,7 +146,7 @@
                 </select>
                 <div class="field-toggle">
                     <input type="checkbox" class="toggle-field" data-field="ips-sensor" checked>
-                    <label>IPS Sensor</label>
+                    <label for="ips-sensor">IPS Sensor</label>
                 </div>
                 <select class="ips-sensor">
                     <option value="">None</option>
@@ -142,31 +154,40 @@
                         <option value="{{ sensor }}">{{ sensor }}</option>
                     {% endfor %}
                 </select>
-                <label>Log Traffic</label>
+                <label for="logtraffic">Log Traffic</label>
                 <select class="logtraffic">
                     <option value="all">All</option>
                     <option value="utm">UTM</option>
                     <option value="disable">Disable</option>
                 </select>
-                <label>Log Traffic Start</label>
+                <label for="logtraffic-start">Log Traffic Start</label>
                 <select class="logtraffic-start">
                     <option value="enable">Enable</option>
                     <option value="disable">Disable</option>
                 </select>
-                <label>Auto ASIC Offload</label>
+                <label for="auto-asic-offload">Auto ASIC Offload</label>
                 <select class="auto-asic-offload">
                     <option value="enable">Enable</option>
                     <option value="disable">Disable</option>
                 </select>
-                <label>NAT</label>
-                <select class="nat">
+                <label for="nat">NAT</label>
+                <select class="nat" onchange="toggleIpPoolField(this)">
                     <option value="disable">Disable</option>
                     <option value="enable">Enable</option>
                 </select>
-                <button onclick="savePolicy(this)">Save Policy</button>
-                <button onclick="clearForm(this)">Clear Form</button>
-                <button onclick="clonePolicy(this)">Clone Policy</button>
-            </div>
+                <div class="ip-pool-section" style="display: none;">
+                    <label for="ip-pool">IP Pool</label>
+                    <select class="ip-pool">
+                        <option value="">None</option>
+                        {% for pool in ip_pools %}
+                            <option value="{{ pool }}">{{ pool }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="button" onclick="savePolicy(this)">Save Policy</button>
+                <button type="button" onclick="clearForm(this)">Clear Form</button>
+                <button type="button" onclick="clonePolicy(this)">Clone Policy</button>
+            </form>
             <button class="generate-policies-btn" onclick="generatePolicies()">Generate All Policies</button>
             <div class="output-section">
                 <h2>Generated Policies</h2>
@@ -188,11 +209,12 @@
             </div>
         </div>
     </div>
+    <div id="notification-container"></div>
     <script>
-        {% if preselected_template %}
-            window.preselectedTemplate = "{{ preselected_template }}";
-        {% endif %}
+        // Pass preselected template to JavaScript
+        window.preselectedTemplate = "{{ preselected_template|default('', true) }}";
     </script>
+    <script src="/static/searchable.js"></script>
     <script src="/static/scripts.js"></script>
 </body>
 </html>

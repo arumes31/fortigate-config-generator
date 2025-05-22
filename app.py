@@ -1,4 +1,4 @@
-# app.py (Version 1.4)
+# app.py (Version 1.6)
 from flask import Flask, request, render_template, jsonify, redirect, send_file
 import json
 import re
@@ -57,6 +57,12 @@ def init_db():
         CREATE TABLE IF NOT EXISTS short_urls (
             short_code TEXT PRIMARY KEY,
             url TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS last_config (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            config_data TEXT NOT NULL
         )
     ''')
     conn.commit()
@@ -180,6 +186,29 @@ def save_short_urls(short_urls):
     conn.close()
     logger.debug("Saved %d short URLs to SQLite", len(short_urls))
 
+# Load last config from SQLite
+def load_last_config():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT config_data FROM last_config ORDER BY id DESC LIMIT 1')
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        logger.debug("Loaded last config from SQLite")
+        return json.loads(result[0])
+    logger.debug("No last config found in SQLite")
+    return None
+
+# Save last config to SQLite
+def save_last_config(config):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM last_config')  # Keep only the latest config
+    cursor.execute('INSERT INTO last_config (config_data) VALUES (?)', (json.dumps(config),))
+    conn.commit()
+    conn.close()
+    logger.debug("Saved last config to SQLite")
+
 # Generate a random short code
 def generate_short_code(length=6):
     characters = string.ascii_letters + string.digits
@@ -263,7 +292,7 @@ def redirect_short_url(short_code):
         logger.error(f"Could not extract template name from URL: {original_url}")
         return jsonify({"error": "Invalid template URL in short URL"}), 400
 
-    # Instead of redirecting to the JSON endpoint, render the main page with the template pre-selected
+    # Render the main page with the template pre-selected
     logger.debug(f"Rendering main page with pre-selected template: {template_name}")
     return index(preselected_template=template_name)
 
@@ -290,28 +319,34 @@ def index(preselected_template=None):
     ips_sensors = []
     interfaces = []
     addresses = []
+    address_groups = []
+    internet_services = []
+    vips = []
+    ip_pools = []
     services = []
     service_groups = {}
     users = []
     groups = []
     
     # Load profiles from the last parsed config (if available)
-    try:
-        with open('/app/data/last_config.json', 'r') as f:
-            config = json.load(f)
-            ssl_ssh_profiles = config.get('ssl_ssh_profiles', [])
-            webfilter_profiles = config.get('webfilter_profiles', [])
-            av_profiles = config.get('av_profiles', [])
-            application_lists = config.get('application_lists', [])
-            ips_sensors = config.get('ips_sensors', [])
-            interfaces = config.get('interfaces', [])
-            addresses = config.get('addresses', [])
-            services = config.get('services', [])
-            service_groups = config.get('service_groups', {})
-            users = config.get('users', [])
-            groups = config.get('groups', [])
-    except FileNotFoundError:
-        logger.debug("No previous config found")
+    config = load_last_config()
+    if config:
+        ssl_ssh_profiles = config.get('ssl_ssh_profiles', [])
+        webfilter_profiles = config.get('webfilter_profiles', [])
+        av_profiles = config.get('av_profiles', [])
+        application_lists = config.get('application_lists', [])
+        ips_sensors = config.get('ips_sensors', [])
+        interfaces = config.get('interfaces', [])
+        addresses = config.get('addresses', [])
+        address_groups = config.get('address_groups', [])
+        internet_services = config.get('internet_services', [])
+        vips = config.get('vips', [])
+        ip_pools = config.get('ip_pools', [])
+        services = config.get('services', [])
+        service_groups = config.get('service_groups', {})
+        users = config.get('users', [])
+        groups = config.get('groups', [])
+        logger.debug("Loaded last config from SQLite")
     
     return render_template(
         'index.html',
@@ -324,6 +359,10 @@ def index(preselected_template=None):
         ips_sensors=ips_sensors,
         interfaces=interfaces,
         addresses=addresses,
+        address_groups=address_groups,
+        internet_services=internet_services,
+        vips=vips,
+        ip_pools=ip_pools,
         services=services,
         service_groups=service_groups,
         users=users,
@@ -365,9 +404,16 @@ def save_template():
             'src_interfaces': policy.get('src_interfaces', []),
             'dst_interfaces': policy.get('dst_interfaces', []),
             'src_addresses': policy.get('src_addresses', []),
+            'src_address_groups': policy.get('src_address_groups', []),
+            'src_internet_services': policy.get('src_internet_services', []),
+            'src_vips': policy.get('src_vips', []),
             'dst_addresses': policy.get('dst_addresses', []),
+            'dst_address_groups': policy.get('dst_address_groups', []),
+            'dst_internet_services': policy.get('dst_internet_services', []),
+            'dst_vips': policy.get('dst_vips', []),
             'services': policy.get('services', []),
             'action': policy.get('action', ''),
+            'inspection_mode': policy.get('inspection_mode', 'flow'),  # Default to flow
             'ssl_ssh_profile': policy.get('ssl_ssh_profile', ''),
             'webfilter_profile': policy.get('webfilter_profile', ''),
             'webfilter_enabled': policy.get('webfilter_enabled', True),
@@ -381,12 +427,25 @@ def save_template():
             'logtraffic_start': policy.get('logtraffic_start', ''),
             'auto_asic_offload': policy.get('auto_asic_offload', ''),
             'nat': policy.get('nat', ''),
+            'ip_pool': policy.get('ip_pool', ''),
             'users': policy.get('users', []),
             'groups': policy.get('groups', [])
         }
+        # Disable profile features if action is deny
+        if policy_data['action'].lower() == 'deny':
+            policy_data['ssl_ssh_profile'] = ''
+            policy_data['webfilter_enabled'] = False
+            policy_data['webfilter_profile'] = ''
+            policy_data['av_enabled'] = False
+            policy_data['av_profile'] = ''
+            policy_data['application_list_enabled'] = False
+            policy_data['application_list'] = ''
+            policy_data['ips_sensor_enabled'] = False
+            policy_data['ips_sensor'] = ''
         logger.debug(f"Saving policy '{policy_data['policy_name']}': users={policy_data['users']}, groups={policy_data['groups']}, "
                      f"webfilter_enabled={policy_data['webfilter_enabled']}, application_list_enabled={policy_data['application_list_enabled']}, "
-                     f"av_enabled={policy_data['av_enabled']}, ips_sensor_enabled={policy_data['ips_sensor_enabled']}")
+                     f"av_enabled={policy_data['av_enabled']}, ips_sensor_enabled={policy_data['ips_sensor_enabled']}, "
+                     f"inspection_mode={policy_data['inspection_mode']}, ip_pool={policy_data['ip_pool']}")
         template_data['policies'].append(policy_data)
 
     try:
@@ -416,11 +475,15 @@ def import_template():
             return jsonify({"error": "Invalid template data format: Must contain policies"}), 400
 
         # Validate template data structure
-        required_policy_fields = ['policy_id', 'policy_name', 'policy_comment', 'src_interfaces', 'dst_interfaces',
-                                  'src_addresses', 'dst_addresses', 'services', 'action', 'ssl_ssh_profile',
-                                  'webfilter_profile', 'webfilter_enabled', 'av_profile', 'av_enabled',
-                                  'application_list', 'application_list_enabled', 'ips_sensor', 'ips_sensor_enabled',
-                                  'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat', 'users', 'groups']
+        required_policy_fields = [
+            'policy_id', 'policy_name', 'policy_comment', 'src_interfaces', 'dst_interfaces',
+            'src_addresses', 'src_address_groups', 'src_internet_services', 'src_vips',
+            'dst_addresses', 'dst_address_groups', 'dst_internet_services', 'dst_vips',
+            'services', 'action', 'inspection_mode', 'ssl_ssh_profile', 'webfilter_profile',
+            'webfilter_enabled', 'av_profile', 'av_enabled', 'application_list',
+            'application_list_enabled', 'ips_sensor', 'ips_sensor_enabled', 'logtraffic',
+            'logtraffic_start', 'auto_asic_offload', 'nat', 'ip_pool', 'users', 'groups'
+        ]
         for policy in template_data['policies']:
             for field in required_policy_fields:
                 if field not in policy:
@@ -428,14 +491,27 @@ def import_template():
                         policy[field] = True
                     elif field == 'av_enabled':
                         policy[field] = False
+                    elif field == 'inspection_mode':
+                        policy[field] = 'flow'  # Default to flow
                     elif field in ['policy_name', 'policy_comment', 'action', 'ssl_ssh_profile',
                                    'webfilter_profile', 'av_profile', 'application_list', 'ips_sensor',
-                                   'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat']:
+                                   'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat', 'ip_pool']:
                         policy[field] = ''
                     else:
                         policy[field] = []
             # Ensure policy_id is unique
             policy['policy_id'] = str(uuid.uuid4())
+            # Disable profile features if action is deny
+            if policy['action'].lower() == 'deny':
+                policy['ssl_ssh_profile'] = ''
+                policy['webfilter_enabled'] = False
+                policy['webfilter_profile'] = ''
+                policy['av_enabled'] = False
+                policy['av_profile'] = ''
+                policy['application_list_enabled'] = False
+                policy['application_list'] = ''
+                policy['ips_sensor_enabled'] = False
+                policy['ips_sensor'] = ''
 
         save_template_to_db(template_name, template_data)
         return jsonify({"status": "success", "message": f"Template '{template_name}' imported"})
@@ -486,6 +562,10 @@ def get_template(template_name):
             # Extract unique config data from template policies
             interfaces = set()
             addresses = set()
+            address_groups = set()
+            internet_services = set()
+            vips = set()
+            ip_pools = set()
             services = []
             service_groups = {}
             ssl_ssh_profiles = set()
@@ -501,6 +581,13 @@ def get_template(template_name):
                 interfaces.update(policy.get('dst_interfaces', []))
                 addresses.update(policy.get('src_addresses', []))
                 addresses.update(policy.get('dst_addresses', []))
+                address_groups.update(policy.get('src_address_groups', []))
+                address_groups.update(policy.get('dst_address_groups', []))
+                internet_services.update(policy.get('src_internet_services', []))
+                internet_services.update(policy.get('dst_internet_services', []))
+                vips.update(policy.get('src_vips', []))
+                vips.update(policy.get('dst_vips', []))
+                ip_pools.add(policy.get('ip_pool', '')) if policy.get('ip_pool') else None
                 for svc in policy.get('services', []):
                     svc_type = svc.get('type', '')
                     svc_name = svc.get('name', '')
@@ -516,15 +603,15 @@ def get_template(template_name):
                             svc_info.update(KNOWN_SERVICES[svc_name])
                         if svc_info not in services:
                             services.append(svc_info)
-                if policy.get('ssl_ssh_profile'):
+                if policy.get('ssl_ssh_profile') and policy.get('action', '').lower() != 'deny':
                     ssl_ssh_profiles.add(policy['ssl_ssh_profile'])
-                if policy.get('webfilter_profile'):
+                if policy.get('webfilter_profile') and policy.get('webfilter_enabled') and policy.get('action', '').lower() != 'deny':
                     webfilter_profiles.add(policy['webfilter_profile'])
-                if policy.get('av_profile'):
+                if policy.get('av_profile') and policy.get('av_enabled') and policy.get('action', '').lower() != 'deny':
                     av_profiles.add(policy['av_profile'])
-                if policy.get('application_list'):
+                if policy.get('application_list') and policy.get('application_list_enabled') and policy.get('action', '').lower() != 'deny':
                     application_lists.add(policy['application_list'])
-                if policy.get('ips_sensor'):
+                if policy.get('ips_sensor') and policy.get('ips_sensor_enabled') and policy.get('action', '').lower() != 'deny':
                     ips_sensors.add(policy['ips_sensor'])
                 users.update(policy.get('users', []))
                 groups.update(policy.get('groups', []))
@@ -536,6 +623,10 @@ def get_template(template_name):
                 "config": {
                     "interfaces": list(interfaces),
                     "addresses": list(addresses),
+                    "address_groups": list(address_groups),
+                    "internet_services": list(internet_services),
+                    "vips": list(vips),
+                    "ip_pools": list(ip_pools),
                     "services": services,
                     "service_groups": service_groups,
                     "ssl_ssh_profiles": list(ssl_ssh_profiles),
@@ -673,8 +764,8 @@ def generate_policy():
         logger.error("No policies provided")
         return jsonify({"error": "At least one policy is required"}), 400
 
-    def generate_single_policy(policy_name, policy_comment, src_intfs, dst_intfs, src_addrs, dst_addrs, svc_names, action, ssl_ssh_profile, webfilter_profile, av_profile, application_list, ips_sensor, logtraffic, logtraffic_start, auto_asic_offload, nat, services, users, groups, include_custom_services=True):
-        if not src_intfs or not dst_intfs or not src_addrs or not dst_addrs or not svc_names:
+    def generate_single_policy(policy_name, policy_comment, src_intfs, dst_intfs, src_addrs, src_agrps, src_isdbs, src_vips, dst_addrs, dst_agrps, dst_isdbs, dst_vips, svc_names, action, inspection_mode, ssl_ssh_profile, webfilter_profile, av_profile, application_list, ips_sensor, logtraffic, logtraffic_start, auto_asic_offload, nat, ip_pool, services, users, groups, include_custom_services=True):
+        if not src_intfs or not dst_intfs or (not src_addrs and not src_agrps and not src_isdbs and not src_vips) or (not dst_addrs and not dst_agrps and not dst_isdbs and not dst_vips) or not svc_names:
             logger.warning(f"Skipping policy generation for {policy_name} due to missing required fields")
             return ""
 
@@ -689,8 +780,16 @@ def generate_policy():
         cli_commands += f'set comments "{policy_comment}"\n'
         cli_commands += "set srcintf " + " ".join([f'"{intf}"' for intf in src_intfs if intf]) + "\n"
         cli_commands += "set dstintf " + " ".join([f'"{intf}"' for intf in dst_intfs if intf]) + "\n"
-        cli_commands += "set srcaddr " + " ".join([f'"{addr}"' for addr in src_addrs if addr]) + "\n"
-        cli_commands += "set dstaddr " + " ".join([f'"{addr}"' for addr in dst_addrs if addr]) + "\n"
+        if src_addrs or src_agrps or src_vips:
+            cli_commands += "set srcaddr " + " ".join([f'"{addr}"' for addr in (src_addrs + src_agrps + src_vips) if addr]) + "\n"
+        if src_isdbs:
+            cli_commands += "set internet-service-src enable\n"
+            cli_commands += "set internet-service-id " + " ".join([f'"{isdb}"' for isdb in src_isdbs if isdb]) + "\n"
+        if dst_addrs or dst_agrps or dst_vips:
+            cli_commands += "set dstaddr " + " ".join([f'"{addr}"' for addr in (dst_addrs + dst_agrps + dst_vips) if addr]) + "\n"
+        if dst_isdbs:
+            cli_commands += "set internet-service enable\n"
+            cli_commands += "set internet-service-id " + " ".join([f'"{isdb}"' for isdb in dst_isdbs if isdb]) + "\n"
 
         if users:
             cli_commands += "set users " + " ".join([f'"{user}"' for user in users if user]) + "\n"
@@ -709,44 +808,56 @@ def generate_policy():
         cli_commands += "set service " + " ".join([f'"{svc}"' for svc in svc_names if svc]) + "\n"
         cli_commands += f'set action {action}\n'
         cli_commands += 'set schedule "always"\n'
-        if ssl_ssh_profile or webfilter_profile or av_profile or application_list or ips_sensor:
+        cli_commands += f'set inspection-mode {inspection_mode}\n'
+        if action.lower() != 'deny' and (ssl_ssh_profile or (webfilter_profile and webfilter_profile != 'disable') or (av_profile and av_profile != 'disable') or (application_list and application_list != 'disable') or (ips_sensor and ips_sensor != 'disable')):
             cli_commands += 'set utm-status enable\n'
-        if ssl_ssh_profile:
+        if action.lower() != 'deny' and ssl_ssh_profile:
             cli_commands += f'set ssl-ssh-profile "{ssl_ssh_profile}"\n'
-        if webfilter_profile:
+        if action.lower() != 'deny' and webfilter_profile and webfilter_profile != 'disable':
             cli_commands += f'set webfilter-profile "{webfilter_profile}"\n'
-        if av_profile:
+        if action.lower() != 'deny' and av_profile and av_profile != 'disable':
             cli_commands += f'set av-profile "{av_profile}"\n'
-        if application_list:
+        if action.lower() != 'deny' and application_list and application_list != 'disable':
             cli_commands += f'set application-list "{application_list}"\n'
-        if ips_sensor:
+        if action.lower() != 'deny' and ips_sensor and ips_sensor != 'disable':
             cli_commands += f'set ips-sensor "{ips_sensor}"\n'
         cli_commands += f'set logtraffic {logtraffic}\n'
         cli_commands += f'set logtraffic-start {logtraffic_start}\n'
         cli_commands += f'set auto-asic-offload {auto_asic_offload}\n'
         cli_commands += f'set nat {nat}\n'
+        if nat.lower() == 'enable' and ip_pool:
+            cli_commands += f'set ippool enable\n'
+            cli_commands += f'set poolname "{ip_pool}"\n'
         cli_commands += "next\nend\n"
         return cli_commands
 
     all_outputs = []
     for policy in policies:
-        policy_name = policy.get('policy_name', 'policy')  # Will be truncated in generate_single_policy if needed
+        policy_name = policy.get('policy_name', 'policy')
         policy_comment = policy.get('policy_comment', 'policy')
         src_interfaces = policy.get('src_interfaces', [])
         dst_interfaces = policy.get('dst_interfaces', [])
         src_addresses = policy.get('src_addresses', [])
+        src_address_groups = policy.get('src_address_groups', [])
+        src_internet_services = policy.get('src_internet_services', [])
+        src_vips = policy.get('src_vips', [])
         dst_addresses = policy.get('dst_addresses', [])
+        dst_address_groups = policy.get('dst_address_groups', [])
+        dst_internet_services = policy.get('dst_internet_services', [])
+        dst_vips = policy.get('dst_vips', [])
         services = policy.get('services', [])
         action = policy.get('action', 'accept')
-        ssl_ssh_profile = policy.get('ssl_ssh_profile', '')
-        webfilter_profile = policy.get('webfilter_profile', '')
-        av_profile = policy.get('av_profile', '')
-        application_list = policy.get('application_list', '')
-        ips_sensor = policy.get('ips_sensor', '')
+        inspection_mode = policy.get('inspection_mode', 'flow')
+        ssl_ssh_profile = policy.get('ssl_ssh_profile', '') if action.lower() != 'deny' else ''
+        webfilter_profile = policy.get('webfilter_profile', '') if policy.get('webfilter_enabled', False) and action.lower() != 'deny' else ''
+        av_profile = policy.get('av_profile', '') if policy.get('av_enabled', False) and action.lower() != 'deny' else ''
+        application_list = policy.get('application_list', '') if policy.get('application_list_enabled', False) and action.lower() != 'deny' else ''
+        ips_sensor = policy.get('ips_sensor', '') if policy.get('ips_sensor_enabled', False) and action.lower() != 'deny' else ''
         logtraffic = policy.get('logtraffic', 'all')
         logtraffic_start = policy.get('logtraffic_start', 'enable')
         auto_asic_offload = policy.get('auto_asic_offload', 'enable')
         nat = policy.get('nat', 'enable')
+        ip_pool = policy.get('ip_pool', '')
         users = policy.get('users', [])
         groups = policy.get('groups', [])
 
@@ -755,9 +866,16 @@ def generate_policy():
         logger.debug(f"Source Interfaces: {src_interfaces}")
         logger.debug(f"Destination Interfaces: {dst_interfaces}")
         logger.debug(f"Source Addresses: {src_addresses}")
+        logger.debug(f"Source Address Groups: {src_address_groups}")
+        logger.debug(f"Source Internet Services: {src_internet_services}")
+        logger.debug(f"Source VIPs: {src_vips}")
         logger.debug(f"Destination Addresses: {dst_addresses}")
+        logger.debug(f"Destination Address Groups: {dst_address_groups}")
+        logger.debug(f"Destination Internet Services: {dst_internet_services}")
+        logger.debug(f"Destination VIPs: {dst_vips}")
         logger.debug(f"Services: {services}")
         logger.debug(f"Action: {action}")
+        logger.debug(f"Inspection Mode: {inspection_mode}")
         logger.debug(f"SSL/SSH Profile: {ssl_ssh_profile}")
         logger.debug(f"Webfilter Profile: {webfilter_profile}")
         logger.debug(f"Antivirus Profile: {av_profile}")
@@ -767,6 +885,7 @@ def generate_policy():
         logger.debug(f"Log Traffic Start: {logtraffic_start}")
         logger.debug(f"Auto ASIC Offload: {auto_asic_offload}")
         logger.debug(f"NAT: {nat}")
+        logger.debug(f"IP Pool: {ip_pool}")
         logger.debug(f"Users: {users}")
         logger.debug(f"Groups: {groups}")
 
@@ -787,9 +906,16 @@ def generate_policy():
             src_intfs=src_interfaces,
             dst_intfs=dst_interfaces,
             src_addrs=src_addresses,
+            src_agrps=src_address_groups,
+            src_isdbs=src_internet_services,
+            src_vips=src_vips,
             dst_addrs=dst_addresses,
+            dst_agrps=dst_address_groups,
+            dst_isdbs=dst_internet_services,
+            dst_vips=dst_vips,
             svc_names=service_names,
             action=action,
+            inspection_mode=inspection_mode,
             ssl_ssh_profile=ssl_ssh_profile,
             webfilter_profile=webfilter_profile,
             av_profile=av_profile,
@@ -799,6 +925,7 @@ def generate_policy():
             logtraffic_start=logtraffic_start,
             auto_asic_offload=auto_asic_offload,
             nat=nat,
+            ip_pool=ip_pool,
             services=services,
             users=users,
             groups=groups
@@ -809,16 +936,23 @@ def generate_policy():
         output2 = ""
         if service_names:
             for svc in service_names:
-                policy_name_svc = f"{policy_name}-{svc}"[:32]  # Already truncated to 32 chars
+                policy_name_svc = f"{policy_name}-{svc}"[:32]
                 output2 += generate_single_policy(
                     policy_name=policy_name_svc,
                     policy_comment=policy_comment,
                     src_intfs=src_interfaces,
                     dst_intfs=dst_interfaces,
                     src_addrs=src_addresses,
+                    src_agrps=src_address_groups,
+                    src_isdbs=src_internet_services,
+                    src_vips=src_vips,
                     dst_addrs=dst_addresses,
+                    dst_agrps=dst_address_groups,
+                    dst_isdbs=dst_internet_services,
+                    dst_vips=dst_vips,
                     svc_names=[svc],
                     action=action,
+                    inspection_mode=inspection_mode,
                     ssl_ssh_profile=ssl_ssh_profile,
                     webfilter_profile=webfilter_profile,
                     av_profile=av_profile,
@@ -828,6 +962,7 @@ def generate_policy():
                     logtraffic_start=logtraffic_start,
                     auto_asic_offload=auto_asic_offload,
                     nat=nat,
+                    ip_pool=ip_pool,
                     services=services,
                     users=users,
                     groups=groups
@@ -849,16 +984,23 @@ def generate_policy():
                     for svc in service_names:
                         if not svc:
                             continue
-                        policy_name_intf_svc = f"{policy_name}-{src_intf}-{dst_intf}-{svc}"[:32]  # Already truncated to 32 chars
+                        policy_name_intf_svc = f"{policy_name}-{src_intf}-{dst_intf}-{svc}"[:32]
                         output3 += generate_single_policy(
                             policy_name=policy_name_intf_svc,
                             policy_comment=policy_comment,
                             src_intfs=[src_intf],
                             dst_intfs=[dst_intf],
                             src_addrs=src_addresses,
+                            src_agrps=src_address_groups,
+                            src_isdbs=src_internet_services,
+                            src_vips=src_vips,
                             dst_addrs=dst_addresses,
+                            dst_agrps=dst_address_groups,
+                            dst_isdbs=dst_internet_services,
+                            dst_vips=dst_vips,
                             svc_names=[svc],
                             action=action,
+                            inspection_mode=inspection_mode,
                             ssl_ssh_profile=ssl_ssh_profile,
                             webfilter_profile=webfilter_profile,
                             av_profile=av_profile,
@@ -868,6 +1010,7 @@ def generate_policy():
                             logtraffic_start=logtraffic_start,
                             auto_asic_offload=auto_asic_offload,
                             nat=nat,
+                            ip_pool=ip_pool,
                             services=services,
                             users=users,
                             groups=groups
@@ -913,6 +1056,10 @@ def parse_config():
 
     interfaces = []
     addresses = []
+    address_groups = []
+    internet_services = []
+    vips = []
+    ip_pools = []
     services = []
     service_groups = {}
     ssl_ssh_profiles = []
@@ -957,11 +1104,13 @@ def parse_config():
         addresses.append(address_name)
         logger.debug("Found address: %s", address_name)
 
+    # Parse address groups
     addrgrp_pattern = re.compile(r'config firewall addrgrp\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in addrgrp_pattern.finditer(content):
         addrgrp_name = match.group(1)
         if addrgrp_name not in addresses:
             addresses.append(addrgrp_name)
+            address_groups.append(addrgrp_name)
             logger.debug("Found address group: %s", addrgrp_name)
 
     if not addresses or len(addresses) == 1:
@@ -987,6 +1136,8 @@ def parse_config():
                     address_name = match.group(1)
                     if address_name not in addresses:
                         addresses.append(address_name)
+                        if inside_addrgrp_section:
+                            address_groups.append(address_name)
                         logger.debug("Found %s (fallback): %s", "address group" if inside_addrgrp_section else "address", address_name)
 
     policy_addr_pattern = re.compile(r'set (?:srcaddr|dstaddr)\s+((?:"[^"]+"\s*)+)', re.DOTALL)
@@ -996,6 +1147,52 @@ def parse_config():
             if addr not in addresses:
                 addresses.append(addr)
                 logger.debug("Found address from policy: %s", addr)
+
+    # Parse internet services
+    internet_service_pattern = re.compile(r'config firewall internet-service-name\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
+    for match in internet_service_pattern.finditer(content):
+        isdb_name = match.group(1)
+        internet_services.append(isdb_name)
+        logger.debug("Found internet service: %s", isdb_name)
+
+    policy_isdb_pattern = re.compile(r'set internet-service-id\s+((?:"[^"]+"\s*)+)', re.DOTALL)
+    for match in policy_isdb_pattern.finditer(content):
+        isdb_list = [isdb.strip('"') for isdb in match.group(1).split()]
+        for isdb in isdb_list:
+            if isdb not in internet_services:
+                internet_services.append(isdb)
+                logger.debug("Found internet service from policy: %s", isdb)
+
+    # Parse virtual IPs
+    vip_pattern = re.compile(r'config firewall vip\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
+    for match in vip_pattern.finditer(content):
+        vip_name = match.group(1)
+        vips.append(vip_name)
+        addresses.append(vip_name)  # Include VIPs in addresses for compatibility
+        logger.debug("Found virtual IP: %s", vip_name)
+
+    policy_vip_pattern = re.compile(r'set (?:srcaddr|dstaddr)\s+((?:"[^"]+"\s*)+)', re.DOTALL)
+    for match in policy_vip_pattern.finditer(content):
+        vip_list = [vip.strip('"') for vip in match.group(1).split()]
+        for vip in vip_list:
+            if vip not in vips and vip in addresses:
+                vips.append(vip)
+                logger.debug("Found virtual IP from policy: %s", vip)
+
+    # Parse IPPools
+    ip_pool_pattern = re.compile(r'config firewall ippool\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
+    for match in ip_pool_pattern.finditer(content):
+        pool_name = match.group(1)
+        ip_pools.append(pool_name)
+        logger.debug("Found IP pool: %s", pool_name)
+
+    policy_ip_pool_pattern = re.compile(r'set poolname\s+((?:"[^"]+"\s*)+)', re.DOTALL)
+    for match in policy_ip_pool_pattern.finditer(content):
+        pool_list = [pool.strip('"') for pool in match.group(1).split()]
+        for pool in pool_list:
+            if pool not in ip_pools:
+                ip_pools.append(pool)
+                logger.debug("Found IP pool from policy: %s", pool)
 
     # Parse services
     service_pattern = re.compile(
@@ -1102,11 +1299,14 @@ def parse_config():
             logger.debug("Found IPS sensor: %s", sensor_name)
     logger.debug("Total IPS sensors found via regex: %d", len(ips_sensors))
 
-    # Fallback line-by-line parsing for interfaces, addresses, services, users, groups, and profiles
+    # Fallback line-by-line parsing for interfaces, addresses, address groups, internet services, VIPs, services, users, groups, and profiles
     lines = content.splitlines()
     inside_interface_section = False
     inside_address_section = False
     inside_addrgrp_section = False
+    inside_internet_service_section = False
+    inside_vip_section = False
+    inside_ip_pool_section = False
     inside_service_section = False
     inside_service_group_section = False
     inside_user_section = False
@@ -1132,6 +1332,18 @@ def parse_config():
         if line.startswith('config firewall addrgrp'):
             inside_addrgrp_section = True
             logger.debug("Entered config firewall addrgrp section")
+            continue
+        if line.startswith('config firewall internet-service-name'):
+            inside_internet_service_section = True
+            logger.debug("Entered config firewall internet-service-name section")
+            continue
+        if line.startswith('config firewall vip'):
+            inside_vip_section = True
+            logger.debug("Entered config firewall vip section")
+            continue
+        if line.startswith('config firewall ippool'):
+            inside_ip_pool_section = True
+            logger.debug("Entered config firewall ippool section")
             continue
         if line.startswith('config firewall service custom'):
             inside_service_section = True
@@ -1190,6 +1402,15 @@ def parse_config():
             elif inside_addrgrp_section:
                 inside_addrgrp_section = False
                 logger.debug("Exited config firewall addrgrp section")
+            elif inside_internet_service_section:
+                inside_internet_service_section = False
+                logger.debug("Exited config firewall internet-service-name section")
+            elif inside_vip_section:
+                inside_vip_section = False
+                logger.debug("Exited config firewall vip section")
+            elif inside_ip_pool_section:
+                inside_ip_pool_section = False
+                logger.debug("Exited config firewall ippool section")
             elif inside_service_section:
                 inside_service_section = False
                 logger.debug("Exited config firewall service custom section")
@@ -1223,6 +1444,9 @@ def parse_config():
             inside_interface_section or
             inside_address_section or
             inside_addrgrp_section or
+            inside_internet_service_section or
+            inside_vip_section or
+            inside_ip_pool_section or
             inside_service_section or
             inside_service_group_section or
             inside_user_section or
@@ -1245,7 +1469,18 @@ def parse_config():
                     logger.debug("Found address (fallback): %s", name)
                 elif inside_addrgrp_section and name not in addresses:
                     addresses.append(name)
+                    address_groups.append(name)
                     logger.debug("Found address group (fallback): %s", name)
+                elif inside_internet_service_section and name not in internet_services:
+                    internet_services.append(name)
+                    logger.debug("Found internet service (fallback): %s", name)
+                elif inside_vip_section and name not in vips:
+                    vips.append(name)
+                    addresses.append(name)
+                    logger.debug("Found virtual IP (fallback): %s", name)
+                elif inside_ip_pool_section and name not in ip_pools:
+                    ip_pools.append(name)
+                    logger.debug("Found IP pool (fallback): %s", name)
                 elif inside_user_section and name not in users:
                     users.append(name)
                     logger.debug("Found user (fallback): %s", name)
@@ -1272,6 +1507,10 @@ def parse_config():
 
     logger.debug("Final total interfaces found: %d", len(interfaces))
     logger.debug("Final total addresses found: %d", len(addresses))
+    logger.debug("Final total address groups found: %d", len(address_groups))
+    logger.debug("Final total internet services found: %d", len(internet_services))
+    logger.debug("Final total virtual IPs found: %d", len(vips))
+    logger.debug("Final total IP pools found: %d", len(ip_pools))
     logger.debug("Final total services found: %d", len(services))
     logger.debug("Final total service groups found: %d", len(service_groups))
     logger.debug("Final total users found: %d", len(users))
@@ -1285,6 +1524,10 @@ def parse_config():
     response = {
         "interfaces": interfaces,
         "addresses": addresses,
+        "address_groups": address_groups,
+        "internet_services": internet_services,
+        "vips": vips,
+        "ip_pools": ip_pools,
         "services": services,
         "service_groups": service_groups,
         "ssl_ssh_profiles": ssl_ssh_profiles,
@@ -1296,10 +1539,8 @@ def parse_config():
         "groups": groups
     }
     
-    # Save parsed config for use in index
-    os.makedirs(os.path.dirname('/app/data/last_config.json'), exist_ok=True)
-    with open('/app/data/last_config.json', 'w') as f:
-        json.dump(response, f)
+    # Save parsed config to SQLite
+    save_last_config(response)
     
     logger.debug("Returning parsed config response: %s", response)
     return jsonify(response)

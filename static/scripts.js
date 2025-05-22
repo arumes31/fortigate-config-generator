@@ -1,7 +1,11 @@
-// scripts.js (Version 1.8)
+// scripts.js (Version 1.15)
 let policies = [];
 let interfaces = [];
 let addresses = [];
+let addressGroups = [];
+let internetServices = [];
+let vips = [];
+let ipPools = [];
 let services = [];
 let serviceGroups = {};
 let sslSshProfiles = [];
@@ -44,9 +48,16 @@ function addPolicy() {
         srcInterfaces: [],
         dstInterfaces: [],
         srcAddresses: [],
+        srcAddressGroups: [],
+        srcInternetServices: [],
+        srcVips: [],
         dstAddresses: [],
+        dstAddressGroups: [],
+        dstInternetServices: [],
+        dstVips: [],
         services: [],
         action: 'accept',
+        inspectionMode: 'flow',
         ssl_ssh_profile: '',
         webfilter_profile: '',
         webfilter_enabled: true,
@@ -60,6 +71,7 @@ function addPolicy() {
         logtraffic_start: 'enable',
         auto_asic_offload: 'enable',
         nat: 'disable',
+        ip_pool: '',
         users: [],
         groups: []
     });
@@ -86,6 +98,34 @@ function renderPolicyList() {
     });
 }
 
+function toggleProfileFields(selectElement) {
+    const form = selectElement.closest('#policy-form');
+    if (!form) return;
+    const isDeny = selectElement.value === 'deny';
+    const fields = ['ssl-ssh-profile', 'webfilter-profile', 'application-list', 'av-profile', 'ips-sensor'];
+    
+    fields.forEach(field => {
+        const select = form.querySelector(`.${field}`);
+        const checkbox = form.querySelector(`.toggle-field[data-field="${field}"]`);
+        if (select && checkbox) {
+            select.disabled = isDeny || !checkbox.checked;
+            checkbox.disabled = isDeny;
+            if (isDeny) {
+                select.value = '';
+                checkbox.checked = false;
+            }
+        }
+    });
+}
+
+function toggleIpPoolField(selectElement) {
+    const form = selectElement.closest('#policy-form');
+    if (!form) return;
+    const ipPoolSection = form.querySelector('.ip-pool-section');
+    if (!ipPoolSection) return;
+    ipPoolSection.style.display = selectElement.value === 'enable' ? 'block' : 'none';
+}
+
 function selectPolicy(policyId) {
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
@@ -104,46 +144,58 @@ function selectPolicy(policyId) {
         form.querySelector('.policy-name').value = policy.name || '';
         form.querySelector('.policy-comment').value = policy.comment || '';
         form.querySelector('.action').value = policy.action || 'accept';
+        form.querySelector('.inspection-mode').value = policy.inspectionMode || 'flow';
         form.querySelector('.ssl-ssh-profile').value = policy.ssl_ssh_profile || '';
         
         // Webfilter Profile
         const webfilterCheckbox = form.querySelector('.toggle-field[data-field="webfilter-profile"]');
         const webfilterSelect = form.querySelector('.webfilter-profile');
         webfilterCheckbox.checked = policy.webfilter_enabled;
-        webfilterSelect.disabled = !policy.webfilter_enabled;
+        webfilterSelect.disabled = !policy.webfilter_enabled || policy.action === 'deny';
         webfilterSelect.value = policy.webfilter_enabled ? (policy.webfilter_profile || '') : '';
+        webfilterCheckbox.disabled = policy.action === 'deny';
         
         // Application List
         const appListCheckbox = form.querySelector('.toggle-field[data-field="application-list"]');
         const appListSelect = form.querySelector('.application-list');
         appListCheckbox.checked = policy.application_list_enabled;
-        appListSelect.disabled = !policy.application_list_enabled;
+        appListSelect.disabled = !policy.application_list_enabled || policy.action === 'deny';
         appListSelect.value = policy.application_list_enabled ? (policy.application_list || '') : '';
+        appListCheckbox.disabled = policy.action === 'deny';
 
         // Antivirus
         const avCheckbox = form.querySelector('.toggle-field[data-field="av-profile"]');
         const avSelect = form.querySelector('.av-profile');
         avCheckbox.checked = policy.av_enabled;
-        avSelect.disabled = !policy.av_enabled;
+        avSelect.disabled = !policy.av_enabled || policy.action === 'deny';
         avSelect.value = policy.av_enabled ? (policy.av_profile || '') : '';
+        avCheckbox.disabled = policy.action === 'deny';
         
         // IPS Sensor
         const ipsSensorCheckbox = form.querySelector('.toggle-field[data-field="ips-sensor"]');
         const ipsSensorSelect = form.querySelector('.ips-sensor');
         ipsSensorCheckbox.checked = policy.ips_sensor_enabled;
-        ipsSensorSelect.disabled = !policy.ips_sensor_enabled;
+        ipsSensorSelect.disabled = !policy.ips_sensor_enabled || policy.action === 'deny';
         ipsSensorSelect.value = policy.ips_sensor_enabled ? (policy.ips_sensor || '') : '';
+        ipsSensorCheckbox.disabled = policy.action === 'deny';
 
         form.querySelector('.logtraffic').value = policy.logtraffic || 'all';
         form.querySelector('.logtraffic-start').value = policy.logtraffic_start || 'enable';
         form.querySelector('.auto-asic-offload').value = policy.auto_asic_offload || 'enable';
         form.querySelector('.nat').value = policy.nat || 'disable';
+        form.querySelector('.ip-pool').value = policy.ip_pool || '';
+        
+        // Toggle IP pool section visibility
+        const ipPoolSection = form.querySelector('.ip-pool-section');
+        if (ipPoolSection) {
+            ipPoolSection.style.display = policy.nat === 'enable' ? 'block' : 'none';
+        }
 
         renderInterfaces(form.querySelector('.src-interfaces .interface-items'), policy.srcInterfaces, 'src');
         renderInterfaces(form.querySelector('.dst-interfaces .interface-items'), policy.dstInterfaces, 'dst');
-        renderAddresses(form.querySelector('.src-addresses .address-items'), policy.srcAddresses, 'src');
-        renderAddresses(form.querySelector('.dst-addresses .address-items'), policy.dstAddresses, 'dst');
-        renderServices(form.querySelector('.services'), policy.services);
+        renderAddresses(form.querySelector('.src-addresses .address-items'), policy.srcAddresses, policy.srcAddressGroups, policy.srcInternetServices, policy.srcVips, 'src');
+        renderAddresses(form.querySelector('.dst-addresses .address-items'), policy.dstAddresses, policy.dstAddressGroups, policy.dstInternetServices, policy.dstVips, 'dst');
+        renderServices(form.querySelector('.services .service-items'), policy.services);
         renderUsersGroups(form.querySelector('.src-users-groups .user-group-items'), policy.users, policy.groups);
     } catch (error) {
         console.error('Error in selectPolicy:', error);
@@ -170,23 +222,45 @@ function renderInterfaces(container, items, type) {
     });
 }
 
-function renderAddresses(container, items, type) {
+function renderAddresses(container, addrItems, addrGroupItems, isdbItems, vipItems, type) {
     if (!container) {
         console.error('Address items container not found');
         return;
     }
     container.innerHTML = '';
-    items.forEach((item, index) => {
+    const allItems = [
+        ...addrItems.map(item => ({ type: 'address', value: item })),
+        ...addrGroupItems.map(item => ({ type: 'address_group', value: item })),
+        ...isdbItems.map(item => ({ type: 'isdb', value: item })),
+        ...vipItems.map(item => ({ type: 'vip', value: item }))
+    ];
+
+    allItems.forEach((item, index) => {
         const div = document.createElement('div');
         div.className = 'address-item';
         div.innerHTML = `
-            <select onchange="updateAddress('${type}', ${index}, this.value)">
-                <option value="">Select Address</option>
-                ${addresses.map(addr => `<option value="${addr}" ${item === addr ? 'selected' : ''}>${addr}</option>`).join('')}
+            <select class="address-select" onchange="updateAddressOrInternetService('${type}', ${index}, this.value)">
+                <option value="">Select Address/ISDB</option>
+                <optgroup label="Addresses">
+                    ${addresses.map(addr => `<option value="address:${addr}" ${item.type === 'address' && item.value === addr ? 'selected' : ''}>${addr}</option>`).join('')}
+                </optgroup>
+                <optgroup label="Address Groups">
+                    ${addressGroups.map(agrp => `<option value="address_group:${agrp}" ${item.type === 'address_group' && item.value === agrp ? 'selected' : ''}>${agrp}</option>`).join('')}
+                </optgroup>
+                <optgroup label="Internet Services">
+                    ${internetServices.map(isdb => `<option value="isdb:${isdb}" ${item.type === 'isdb' && item.value === isdb ? 'selected' : ''}>${isdb}</option>`).join('')}
+                </optgroup>
+                <optgroup label="Virtual IPs">
+                    ${vips.map(vip => `<option value="vip:${vip}" ${item.type === 'vip' && item.value === vip ? 'selected' : ''}>${vip}</option>`).join('')}
+                </optgroup>
             </select>
-            <button onclick="deleteAddress('${type}', ${index})">Delete</button>
+            <button onclick="deleteAddressOrInternetService('${type}', ${index})">Delete</button>
         `;
         container.appendChild(div);
+        // Initialize custom searchable select
+        initSearchableSelect(div.querySelector('.address-select'), {
+            placeholder: 'Select Address/ISDB'
+        });
     });
 }
 
@@ -238,7 +312,7 @@ function renderUsersGroups(container, userItems, groupItems) {
         const div = document.createElement('div');
         div.className = 'user-group-item';
         div.innerHTML = `
-            <select onchange="updateUserOrGroup(${index}, this.value)">
+            <select class="user-group-select" onchange="updateUserOrGroup(${index}, this.value)">
                 <option value="">Select User/Group</option>
                 <optgroup label="Users">
                     ${users.map(user => `<option value="user:${user}" ${isUser && item === user ? 'selected' : ''}>${user}</option>`).join('')}
@@ -250,6 +324,10 @@ function renderUsersGroups(container, userItems, groupItems) {
             <button onclick="deleteUserOrGroup(${index})">Delete</button>
         `;
         container.appendChild(div);
+        // Initialize custom searchable select
+        initSearchableSelect(div.querySelector('.user-group-select'), {
+            placeholder: 'Select User/Group'
+        });
     });
 }
 
@@ -264,8 +342,9 @@ function updateDropdowns() {
     const appListSelect = form.querySelector('.application-list');
     const avSelect = form.querySelector('.av-profile');
     const ipsSensorSelect = form.querySelector('.ips-sensor');
+    const ipPoolSelect = form.querySelector('.ip-pool');
 
-    if (!sslSshSelect || !webfilterSelect || !appListSelect || !avSelect || !ipsSensorSelect) {
+    if (!sslSshSelect || !webfilterSelect || !appListSelect || !avSelect || !ipsSensorSelect || !ipPoolSelect) {
         console.error('One or more dropdown elements not found');
         return;
     }
@@ -275,6 +354,7 @@ function updateDropdowns() {
     appListSelect.innerHTML = `<option value="">None</option>${applicationLists.map(l => `<option value="${l}">${l}</option>`).join('')}`;
     avSelect.innerHTML = `<option value="">None</option>${avProfiles.map(p => `<option value="${p}">${p}</option>`).join('')}`;
     ipsSensorSelect.innerHTML = `<option value="">None</option>${ipsSensors.map(s => `<option value="${s}">${s}</option>`).join('')}`;
+    ipPoolSelect.innerHTML = `<option value="">None</option>${ipPools.map(p => `<option value="${p}">${p}</option>`).join('')}`;
 
     const policyId = form.dataset.policyId;
     if (policyId) {
@@ -315,7 +395,7 @@ function addDstInterface(button) {
 function addSrcAddress(button) {
     const policyId = button.closest('#policy-form')?.dataset.policyId;
     if (!policyId) {
-        console.error('Policy ID not found for adding source address');
+        console.error('Policy ID not found for adding source address/ISDB');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
@@ -330,7 +410,7 @@ function addSrcAddress(button) {
 function addDstAddress(button) {
     const policyId = button.closest('#policy-form')?.dataset.policyId;
     if (!policyId) {
-        console.error('Policy ID not found for adding destination address');
+        console.error('Policy ID not found for adding destination address/ISDB');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
@@ -390,10 +470,10 @@ function updateInterface(type, index, value) {
     }
 }
 
-function updateAddress(type, index, value) {
+function updateAddressOrInternetService(type, index, value) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
-        console.error('Policy ID not found for updating address');
+        console.error('Policy ID not found for updating address/ISDB');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
@@ -401,11 +481,76 @@ function updateAddress(type, index, value) {
         console.error(`Policy with ID ${policyId} not found`);
         return;
     }
-    if (type === 'src') {
-        policy.srcAddresses[index] = value;
+    const [itemType, itemValue] = value.split(':');
+    const isAddress = itemType === 'address';
+    const isAddressGroup = itemType === 'address_group';
+    const isInternetService = itemType === 'isdb';
+    const isVip = itemType === 'vip';
+    
+    const addrList = type === 'src' ? policy.srcAddresses : policy.dstAddresses;
+    const addrGroupList = type === 'src' ? policy.srcAddressGroups : policy.dstAddressGroups;
+    const isdbList = type === 'src' ? policy.srcInternetServices : policy.dstInternetServices;
+    const vipList = type === 'src' ? policy.srcVips : policy.dstVips;
+    
+    const totalLength = addrList.length + addrGroupList.length + isdbList.length + vipList.length;
+    
+    if (index < addrList.length) {
+        if (isAddress) {
+            addrList[index] = itemValue;
+        } else if (isAddressGroup) {
+            addrList.splice(index, 1);
+            addrGroupList.splice(index - addrList.length, 0, itemValue);
+        } else if (isInternetService) {
+            addrList.splice(index, 1);
+            isdbList.splice(index - addrList.length, 0, itemValue);
+        } else if (isVip) {
+            addrList.splice(index, 1);
+            vipList.splice(index - addrList.length, 0, itemValue);
+        }
+    } else if (index < addrList.length + addrGroupList.length) {
+        const agrpIndex = index - addrList.length;
+        if (isAddressGroup) {
+            addrGroupList[agrpIndex] = itemValue;
+        } else if (isAddress) {
+            addrGroupList.splice(agrpIndex, 1);
+            addrList.splice(index, 0, itemValue);
+        } else if (isInternetService) {
+            addrGroupList.splice(agrpIndex, 1);
+            isdbList.splice(index - addrList.length - addrGroupList.length, 0, itemValue);
+        } else if (isVip) {
+            addrGroupList.splice(agrpIndex, 1);
+            vipList.splice(index - addrList.length - addrGroupList.length, 0, itemValue);
+        }
+    } else if (index < addrList.length + addrGroupList.length + isdbList.length) {
+        const isdbIndex = index - addrList.length - addrGroupList.length;
+        if (isInternetService) {
+            isdbList[isdbIndex] = itemValue;
+        } else if (isAddress) {
+            isdbList.splice(isdbIndex, 1);
+            addrList.splice(index, 0, itemValue);
+        } else if (isAddressGroup) {
+            isdbList.splice(isdbIndex, 1);
+            addrGroupList.splice(index - addrList.length, 0, itemValue);
+        } else if (isVip) {
+            isdbList.splice(isdbIndex, 1);
+            vipList.splice(index - addrList.length - addrGroupList.length, 0, itemValue);
+        }
     } else {
-        policy.dstAddresses[index] = value;
+        const vipIndex = index - addrList.length - addrGroupList.length - isdbList.length;
+        if (isVip) {
+            vipList[vipIndex] = itemValue;
+        } else if (isAddress) {
+            vipList.splice(vipIndex, 1);
+            addrList.splice(index, 0, itemValue);
+        } else if (isAddressGroup) {
+            vipList.splice(vipIndex, 1);
+            addrGroupList.splice(index - addrList.length, 0, itemValue);
+        } else if (isInternetService) {
+            vipList.splice(vipIndex, 1);
+            isdbList.splice(index - addrList.length - addrGroupList.length, 0, itemValue);
+        }
     }
+    selectPolicy(policyId);
 }
 
 function updateService(index, value) {
@@ -456,7 +601,6 @@ function updateUserOrGroup(index, value) {
         return;
     }
     const [type, name] = value.split(':');
-    const totalItems = policy.users.length + policy.groups.length;
     if (index < policy.users.length) {
         if (type === 'user') {
             policy.users[index] = name;
@@ -495,10 +639,10 @@ function deleteInterface(type, index) {
     selectPolicy(policyId);
 }
 
-function deleteAddress(type, index) {
+function deleteAddressOrInternetService(type, index) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
-        console.error('Policy ID not found for deleting address');
+        console.error('Policy ID not found for deleting address/ISDB');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
@@ -506,10 +650,19 @@ function deleteAddress(type, index) {
         console.error(`Policy with ID ${policyId} not found`);
         return;
     }
-    if (type === 'src') {
-        policy.srcAddresses.splice(index, 1);
+    const addrList = type === 'src' ? policy.srcAddresses : policy.dstAddresses;
+    const addrGroupList = type === 'src' ? policy.srcAddressGroups : policy.dstAddressGroups;
+    const isdbList = type === 'src' ? policy.srcInternetServices : policy.dstInternetServices;
+    const vipList = type === 'src' ? policy.srcVips : policy.dstVips;
+    
+    if (index < addrList.length) {
+        addrList.splice(index, 1);
+    } else if (index < addrList.length + addrGroupList.length) {
+        addrGroupList.splice(index - addrList.length, 1);
+    } else if (index < addrList.length + addrGroupList.length + isdbList.length) {
+        isdbList.splice(index - addrList.length - addrGroupList.length, 1);
     } else {
-        policy.dstAddresses.splice(index, 1);
+        vipList.splice(index - addrList.length - addrGroupList.length - isdbList.length, 1);
     }
     selectPolicy(policyId);
 }
@@ -589,24 +742,27 @@ function savePolicy(button) {
         const policyName = form.querySelector('.policy-name')?.value || '';
         const policyComment = form.querySelector('.policy-comment')?.value || '';
         const action = form.querySelector('.action')?.value || 'accept';
-        const sslSshProfile = form.querySelector('.ssl-ssh-profile')?.value || '';
+        const inspectionMode = form.querySelector('.inspection-mode')?.value || 'flow';
+        const sslSshProfile = action === 'deny' ? '' : (form.querySelector('.ssl-ssh-profile')?.value || '');
         const webfilterProfile = form.querySelector('.webfilter-profile');
-        const webfilterEnabled = form.querySelector('.toggle-field[data-field="webfilter-profile"]').checked;
+        const webfilterEnabled = action === 'deny' ? false : form.querySelector('.toggle-field[data-field="webfilter-profile"]').checked;
         const applicationList = form.querySelector('.application-list');
-        const applicationListEnabled = form.querySelector('.toggle-field[data-field="application-list"]').checked;
+        const applicationListEnabled = action === 'deny' ? false : form.querySelector('.toggle-field[data-field="application-list"]').checked;
         const avProfile = form.querySelector('.av-profile');
-        const avEnabled = form.querySelector('.toggle-field[data-field="av-profile"]').checked;
+        const avEnabled = action === 'deny' ? false : form.querySelector('.toggle-field[data-field="av-profile"]').checked;
         const ipsSensor = form.querySelector('.ips-sensor');
-        const ipsSensorEnabled = form.querySelector('.toggle-field[data-field="ips-sensor"]').checked;
+        const ipsSensorEnabled = action === 'deny' ? false : form.querySelector('.toggle-field[data-field="ips-sensor"]').checked;
         const logtraffic = form.querySelector('.logtraffic')?.value || 'all';
         const logtrafficStart = form.querySelector('.logtraffic-start')?.value || 'enable';
         const autoAsicOffload = form.querySelector('.auto-asic-offload')?.value || 'enable';
         const nat = form.querySelector('.nat')?.value || 'disable';
+        const ipPool = nat === 'enable' ? (form.querySelector('.ip-pool')?.value || '') : '';
 
         console.log('Form values:', {
             policyName,
             policyComment,
             action,
+            inspectionMode,
             sslSshProfile,
             webfilterProfile: webfilterProfile.value,
             webfilterEnabled,
@@ -619,13 +775,15 @@ function savePolicy(button) {
             logtraffic,
             logtrafficStart,
             autoAsicOffload,
-            nat
+            nat,
+            ipPool
         });
 
         // Update policy
         policy.name = policyName;
         policy.comment = policyComment;
         policy.action = action;
+        policy.inspectionMode = inspectionMode;
         policy.ssl_ssh_profile = sslSshProfile;
         policy.webfilter_enabled = webfilterEnabled;
         policy.webfilter_profile = webfilterEnabled ? webfilterProfile.value : '';
@@ -639,6 +797,7 @@ function savePolicy(button) {
         policy.logtraffic_start = logtrafficStart;
         policy.auto_asic_offload = autoAsicOffload;
         policy.nat = nat;
+        policy.ip_pool = ipPool;
 
         console.log('Policy updated:', policy);
 
@@ -674,9 +833,16 @@ function clonePolicy(button) {
                 srcInterfaces: data.new_policy.src_interfaces,
                 dstInterfaces: data.new_policy.dst_interfaces,
                 srcAddresses: data.new_policy.src_addresses,
+                srcAddressGroups: data.new_policy.src_address_groups,
+                srcInternetServices: data.new_policy.src_internet_services,
+                srcVips: data.new_policy.src_vips,
                 dstAddresses: data.new_policy.dst_addresses,
+                dstAddressGroups: data.new_policy.dst_address_groups,
+                dstInternetServices: data.new_policy.dst_internet_services,
+                dstVips: data.new_policy.dst_vips,
                 services: data.new_policy.services,
                 action: data.new_policy.action,
+                inspectionMode: data.new_policy.inspection_mode,
                 ssl_ssh_profile: data.new_policy.ssl_ssh_profile,
                 webfilter_profile: data.new_policy.webfilter_profile,
                 webfilter_enabled: data.new_policy.webfilter_enabled,
@@ -690,6 +856,7 @@ function clonePolicy(button) {
                 logtraffic_start: data.new_policy.logtraffic_start,
                 auto_asic_offload: data.new_policy.auto_asic_offload,
                 nat: data.new_policy.nat,
+                ip_pool: data.new_policy.ip_pool,
                 users: data.new_policy.users,
                 groups: data.new_policy.groups
             });
@@ -716,6 +883,7 @@ function clearForm(button) {
     form.querySelector('.policy-name').value = '';
     form.querySelector('.policy-comment').value = '';
     form.querySelector('.action').value = 'accept';
+    form.querySelector('.inspection-mode').value = 'flow';
     form.querySelector('.ssl-ssh-profile').value = '';
     
     // Reset Webfilter Profile
@@ -724,6 +892,7 @@ function clearForm(button) {
     webfilterCheckbox.checked = true;
     webfilterSelect.disabled = false;
     webfilterSelect.value = '';
+    webfilterCheckbox.disabled = false;
     
     // Reset Application List
     const appListCheckbox = form.querySelector('.toggle-field[data-field="application-list"]');
@@ -731,6 +900,7 @@ function clearForm(button) {
     appListCheckbox.checked = true;
     appListSelect.disabled = false;
     appListSelect.value = '';
+    appListCheckbox.disabled = false;
 
     // Reset Antivirus
     const avCheckbox = form.querySelector('.toggle-field[data-field="av-profile"]');
@@ -738,6 +908,7 @@ function clearForm(button) {
     avCheckbox.checked = false;
     avSelect.disabled = true;
     avSelect.value = '';
+    avCheckbox.disabled = false;
     
     // Reset IPS Sensor
     const ipsSensorCheckbox = form.querySelector('.toggle-field[data-field="ips-sensor"]');
@@ -745,17 +916,20 @@ function clearForm(button) {
     ipsSensorCheckbox.checked = true;
     ipsSensorSelect.disabled = false;
     ipsSensorSelect.value = '';
+    ipsSensorCheckbox.disabled = false;
 
     form.querySelector('.logtraffic').value = 'all';
     form.querySelector('.logtraffic-start').value = 'enable';
     form.querySelector('.auto-asic-offload').value = 'enable';
     form.querySelector('.nat').value = 'disable';
+    form.querySelector('.ip-pool').value = '';
     form.querySelector('.src-interfaces .interface-items').innerHTML = '';
     form.querySelector('.dst-interfaces .interface-items').innerHTML = '';
     form.querySelector('.src-addresses .address-items').innerHTML = '';
     form.querySelector('.dst-addresses .address-items').innerHTML = '';
-    form.querySelector('.services').innerHTML = '';
+    form.querySelector('.services .service-items').innerHTML = '';
     form.querySelector('.src-users-groups .user-group-items').innerHTML = '';
+    form.querySelector('.ip-pool-section').style.display = 'none';
 
     const policyId = form.dataset.policyId;
     const policy = policies.find(p => p.id === policyId);
@@ -763,10 +937,17 @@ function clearForm(button) {
         policy.srcInterfaces = [];
         policy.dstInterfaces = [];
         policy.srcAddresses = [];
+        policy.srcAddressGroups = [];
+        policy.srcInternetServices = [];
+        policy.srcVips = [];
         policy.dstAddresses = [];
+        policy.dstAddressGroups = [];
+        policy.dstInternetServices = [];
+        policy.dstVips = [];
         policy.services = [];
         policy.users = [];
         policy.groups = [];
+        policy.inspectionMode = 'flow';
         policy.webfilter_enabled = true;
         policy.webfilter_profile = '';
         policy.application_list_enabled = true;
@@ -775,6 +956,7 @@ function clearForm(button) {
         policy.av_profile = '';
         policy.ips_sensor_enabled = true;
         policy.ips_sensor = '';
+        policy.ip_pool = '';
     }
 }
 
@@ -794,9 +976,16 @@ function saveTemplate() {
         src_interfaces: p.srcInterfaces,
         dst_interfaces: p.dstInterfaces,
         src_addresses: p.srcAddresses,
+        src_address_groups: p.srcAddressGroups,
+        src_internet_services: p.srcInternetServices,
+        src_vips: p.srcVips,
         dst_addresses: p.dstAddresses,
+        dst_address_groups: p.dstAddressGroups,
+        dst_internet_services: p.dstInternetServices,
+        dst_vips: p.dstVips,
         services: p.services,
         action: p.action,
+        inspection_mode: p.inspectionMode,
         ssl_ssh_profile: p.ssl_ssh_profile,
         webfilter_profile: p.webfilter_enabled ? p.webfilter_profile : '',
         webfilter_enabled: p.webfilter_enabled,
@@ -810,6 +999,7 @@ function saveTemplate() {
         logtraffic_start: p.logtraffic_start,
         auto_asic_offload: p.auto_asic_offload,
         nat: p.nat,
+        ip_pool: p.ip_pool,
         users: p.users,
         groups: p.groups
     }))));
@@ -830,30 +1020,30 @@ function saveTemplate() {
 }
 
 function loadTemplateList() {
-    fetch('/load_templates')
-    .then(response => response.json())
-    .then(data => {
-        const select = document.getElementById('template-select');
-        if (!select) {
-            console.error('Template select element not found');
-            return;
-        }
-        select.innerHTML = '<option value="">Select Template</option>';
-        data.templates.forEach(template => {
-            const option = document.createElement('option');
-            option.value = template;
-            option.textContent = template;
-            select.appendChild(option);
+    return new Promise((resolve, reject) => {
+        fetch('/load_templates')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('template-select');
+            if (!select) {
+                console.error('Template select element not found');
+                reject('Template select element not found');
+                return;
+            }
+            select.innerHTML = '<option value="">Select Template</option>';
+            data.templates.forEach(template => {
+                const option = document.createElement('option');
+                option.value = template;
+                option.textContent = template;
+                select.appendChild(option);
+            });
+            resolve();
+        })
+        .catch(error => {
+            console.error('Error loading templates:', error);
+            showNotification('Error loading templates', 'error');
+            reject(error);
         });
-
-        // If a pre-selected template exists, set it in the dropdown
-        if (window.preselectedTemplate) {
-            select.value = window.preselectedTemplate;
-            loadTemplate();
-        }
-    })
-    .catch(error => {
-        console.error('Error loading templates:', error);
     });
 }
 
@@ -875,9 +1065,16 @@ function loadTemplate() {
                 srcInterfaces: p.src_interfaces,
                 dstInterfaces: p.dst_interfaces,
                 srcAddresses: p.src_addresses,
+                srcAddressGroups: p.src_address_groups || [],
+                srcInternetServices: p.src_internet_services || [],
+                srcVips: p.src_vips || [],
                 dstAddresses: p.dst_addresses,
+                dstAddressGroups: p.dst_address_groups || [],
+                dstInternetServices: p.dst_internet_services || [],
+                dstVips: p.dst_vips || [],
                 services: p.services,
                 action: p.action,
+                inspectionMode: p.inspection_mode || 'flow',
                 ssl_ssh_profile: p.ssl_ssh_profile,
                 webfilter_profile: p.webfilter_profile,
                 webfilter_enabled: p.webfilter_enabled !== undefined ? p.webfilter_enabled : true,
@@ -891,6 +1088,7 @@ function loadTemplate() {
                 logtraffic_start: p.logtraffic_start,
                 auto_asic_offload: p.auto_asic_offload,
                 nat: p.nat,
+                ip_pool: p.ip_pool || '',
                 users: p.users || [],
                 groups: p.groups || []
             }));
@@ -898,6 +1096,10 @@ function loadTemplate() {
             // Update global config variables with template data
             interfaces = data.config.interfaces || [];
             addresses = data.config.addresses || [];
+            addressGroups = data.config.address_groups || [];
+            internetServices = data.config.internet_services || [];
+            vips = data.config.vips || [];
+            ipPools = data.config.ip_pools || [];
             services = data.config.services || [];
             serviceGroups = data.config.service_groups || {};
             sslSshProfiles = data.config.ssl_ssh_profiles || [];
@@ -915,6 +1117,10 @@ function loadTemplate() {
                     .then(config => {
                         interfaces = [...new Set([...interfaces, ...(config.interfaces || [])])];
                         addresses = [...new Set([...addresses, ...(config.addresses || [])])];
+                        addressGroups = [...new Set([...addressGroups, ...(config.address_groups || [])])];
+                        internetServices = [...new Set([...internetServices, ...(config.internet_services || [])])];
+                        vips = [...new Set([...vips, ...(config.vips || [])])];
+                        ipPools = [...new Set([...ipPools, ...(config.ip_pools || [])])];
                         services = [...services, ...(config.services || []).filter(s => !services.some(existing => existing.name === s.name))];
                         serviceGroups = { ...serviceGroups, ...(config.service_groups || {}) };
                         sslSshProfiles = [...new Set([...sslSshProfiles, ...(config.ssl_ssh_profiles || [])])];
@@ -1232,6 +1438,10 @@ function importConfig() {
     .then(data => {
         interfaces = data.interfaces || [];
         addresses = data.addresses || [];
+        addressGroups = data.address_groups || [];
+        internetServices = data.internet_services || [];
+        vips = data.vips || [];
+        ipPools = data.ip_pools || [];
         services = data.services || [];
         serviceGroups = data.service_groups || {};
         sslSshProfiles = data.ssl_ssh_profiles || [];
@@ -1269,9 +1479,16 @@ function generatePolicies() {
         src_interfaces: p.srcInterfaces,
         dst_interfaces: p.dstInterfaces,
         src_addresses: p.srcAddresses,
+        src_address_groups: p.srcAddressGroups,
+        src_internet_services: p.srcInternetServices,
+        src_vips: p.srcVips,
         dst_addresses: p.dstAddresses,
+        dst_address_groups: p.dstAddressGroups,
+        dst_internet_services: p.dstInternetServices,
+        dst_vips: p.dstVips,
         services: p.services,
         action: p.action,
+        inspection_mode: p.inspectionMode,
         ssl_ssh_profile: p.ssl_ssh_profile,
         webfilter_profile: p.webfilter_enabled ? p.webfilter_profile : '',
         webfilter_enabled: p.webfilter_enabled,
@@ -1285,6 +1502,7 @@ function generatePolicies() {
         logtraffic_start: p.logtraffic_start,
         auto_asic_offload: p.auto_asic_offload,
         nat: p.nat,
+        ip_pool: p.ip_pool,
         users: p.users,
         groups: p.groups
     }))));
@@ -1365,7 +1583,7 @@ document.addEventListener('DOMContentLoaded', () => {
             checkbox.addEventListener('change', (e) => {
                 const field = e.target.dataset.field;
                 const select = form.querySelector(`.${field}`);
-                select.disabled = !e.target.checked;
+                select.disabled = !e.target.checked || form.querySelector('.action').value === 'deny';
 
                 const policyId = form.dataset.policyId;
                 const policy = policies.find(p => p.id === policyId);
@@ -1379,10 +1597,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    loadTemplateList();
-    // Only add a new policy if no pre-selected template is provided
-    if (!window.preselectedTemplate) {
+    // Load templates and handle pre-selected template
+    loadTemplateList().then(() => {
+        if (window.preselectedTemplate) {
+            const select = document.getElementById('template-select');
+            if (select) {
+                select.value = window.preselectedTemplate;
+                loadTemplate();
+            }
+        } else {
+            addPolicy(); // Only add a new policy if no pre-selected template
+        }
+        updateDropdowns();
+    }).catch(error => {
+        console.error('Failed to initialize templates:', error);
         addPolicy();
-    }
-    updateDropdowns();
+        updateDropdowns();
+    });
 });

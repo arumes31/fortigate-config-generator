@@ -1,4 +1,4 @@
-/* styles.css (Version 1.8) */
+/* styles.css (Version 1.10) */
 /* Define CSS variables for theming */
 :root {
     --background-color: #f4f7fa; /* Soft gray background */
@@ -383,7 +383,8 @@ html, body {
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.policy-form select:disabled {
+.policy-form select:disabled,
+.policy-form input[type="checkbox"]:disabled {
     background-color: var(--disabled-bg);
     color: var(--disabled-text);
     cursor: not-allowed;
@@ -429,24 +430,24 @@ html, body {
     margin-bottom: 15px;
 }
 
-/* Style for the field toggle (checkbox + label) - applies to Webfilter Profile, Application List, Antivirus, and IPS Sensor */
+/* Style for the field toggle (checkbox + label) */
 .field-toggle {
     display: flex;
-    position: relative; /* Ensure the container is not collapsed */
+    position: relative;
     align-items: center;
     margin-bottom: 5px;
 }
 
 .field-toggle input[type="checkbox"] {
-    -webkit-appearance: checkbox; /* Ensure checkbox renders on all browsers */
+    -webkit-appearance: checkbox;
     -moz-appearance: checkbox;
     appearance: checkbox;
     margin-right: 8px;
     width: 16px;
     height: 16px;
-    border: 1px solid var(--border-color); /* Fallback border */
-    background-color: var(--background-color); /* Fallback background */
-    accent-color: var(--accent-color); /* Modern browser styling */
+    border: 1px solid var(--border-color);
+    background-color: var(--background-color);
+    accent-color: var(--accent-color);
     cursor: pointer;
 }
 
@@ -455,6 +456,44 @@ html, body {
     font-weight: 600;
     font-size: 0.95rem;
     color: var(--text-color);
+}
+
+/* Style for IP pool section */
+.ip-pool-section {
+    margin-top: 10px;
+}
+
+.ip-pool-section label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.ip-pool-section select {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    box-sizing: border-box;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ip-pool-section select:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(38, 166, 154, 0.2);
+    outline: none;
+}
+
+.ip-pool-section select:disabled {
+    background-color: var(--disabled-bg);
+    color: var(--disabled-text);
+    cursor: not-allowed;
 }
 
 /* Style for Generate All Policies button */
@@ -507,7 +546,8 @@ html, body {
 }
 
 .form-column-left input,
-.form-column-right input {
+.form-column-right input,
+.form-column-right select {
     margin-bottom: 0;
 }
 
@@ -516,7 +556,8 @@ html, body {
 .src-addresses,
 .dst-addresses,
 .services,
-.src-users-groups {
+.src-users-groups,
+.ip-pool-section {
     margin-bottom: 5px;
 }
 
@@ -525,7 +566,8 @@ html, body {
 .src-addresses label,
 .dst-addresses label,
 .services label,
-.src-users-groups label {
+.src-users-groups label,
+.ip-pool-section label {
     display: block;
     margin-bottom: 5px;
     font-weight: 600;
@@ -672,4 +714,70 @@ html, body {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Styles for searchable.js combo box */
+.searchable-select-wrapper {
+    position: relative;
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.searchable-select-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: text;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.searchable-select-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(38, 166, 154, 0.2);
+    outline: none;
+}
+
+.searchable-select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--card-background);
+    border: 2px solid var(--accent-color);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px var(--shadow-color);
+    z-index: 2000; /* High z-index for visibility */
+    display: none;
+}
+
+.searchable-optgroup-label {
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-color);
+    background: var(--background-color);
+}
+
+.searchable-select-option {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--text-color);
+}
+
+.searchable-select-option:hover,
+.searchable-select-option.selected {
+    background: var(--accent-color);
+    color: #ffffff;
+}
+
+.searchable-select-wrapper select {
+    display: none; /* Hide the original select */
 }
