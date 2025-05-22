@@ -1,7 +1,6 @@
-// scripts.js (Version 1.15)
+// scripts.js (Version 1.17)
 let policies = [];
 let interfaces = [];
-let addresses = [];
 let addressGroups = [];
 let internetServices = [];
 let vips = [];
@@ -20,6 +19,7 @@ function showNotification(message, type = 'success') {
     const container = document.getElementById('notification-container');
     if (!container) {
         console.error('Notification container not found');
+        logToBackend('Notification container not found');
         return;
     }
 
@@ -29,14 +29,24 @@ function showNotification(message, type = 'success') {
 
     container.appendChild(notification);
 
-    // Auto-dismiss after 3 seconds
     setTimeout(() => {
         notification.style.opacity = '0';
         notification.style.transform = 'translateX(100%)';
         setTimeout(() => {
             notification.remove();
-        }, 500); // Match the animation duration
+        }, 500);
     }, 3000);
+}
+
+// New function to send logs to backend
+function logToBackend(message) {
+    fetch('/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+    }).catch(error => {
+        console.error('Error sending log to backend:', error);
+    });
 }
 
 function addPolicy() {
@@ -83,6 +93,7 @@ function renderPolicyList() {
     const policyList = document.getElementById('policy-list');
     if (!policyList) {
         console.error('Policy list element not found');
+        logToBackend('Policy list element not found');
         return;
     }
     policyList.innerHTML = '';
@@ -130,12 +141,14 @@ function selectPolicy(policyId) {
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
 
     const form = document.getElementById('policy-form');
     if (!form) {
         console.error('Policy form element not found');
+        logToBackend('Policy form element not found');
         return;
     }
     form.dataset.policyId = policyId;
@@ -147,7 +160,6 @@ function selectPolicy(policyId) {
         form.querySelector('.inspection-mode').value = policy.inspectionMode || 'flow';
         form.querySelector('.ssl-ssh-profile').value = policy.ssl_ssh_profile || '';
         
-        // Webfilter Profile
         const webfilterCheckbox = form.querySelector('.toggle-field[data-field="webfilter-profile"]');
         const webfilterSelect = form.querySelector('.webfilter-profile');
         webfilterCheckbox.checked = policy.webfilter_enabled;
@@ -155,7 +167,6 @@ function selectPolicy(policyId) {
         webfilterSelect.value = policy.webfilter_enabled ? (policy.webfilter_profile || '') : '';
         webfilterCheckbox.disabled = policy.action === 'deny';
         
-        // Application List
         const appListCheckbox = form.querySelector('.toggle-field[data-field="application-list"]');
         const appListSelect = form.querySelector('.application-list');
         appListCheckbox.checked = policy.application_list_enabled;
@@ -163,7 +174,6 @@ function selectPolicy(policyId) {
         appListSelect.value = policy.application_list_enabled ? (policy.application_list || '') : '';
         appListCheckbox.disabled = policy.action === 'deny';
 
-        // Antivirus
         const avCheckbox = form.querySelector('.toggle-field[data-field="av-profile"]');
         const avSelect = form.querySelector('.av-profile');
         avCheckbox.checked = policy.av_enabled;
@@ -171,7 +181,6 @@ function selectPolicy(policyId) {
         avSelect.value = policy.av_enabled ? (policy.av_profile || '') : '';
         avCheckbox.disabled = policy.action === 'deny';
         
-        // IPS Sensor
         const ipsSensorCheckbox = form.querySelector('.toggle-field[data-field="ips-sensor"]');
         const ipsSensorSelect = form.querySelector('.ips-sensor');
         ipsSensorCheckbox.checked = policy.ips_sensor_enabled;
@@ -185,7 +194,6 @@ function selectPolicy(policyId) {
         form.querySelector('.nat').value = policy.nat || 'disable';
         form.querySelector('.ip-pool').value = policy.ip_pool || '';
         
-        // Toggle IP pool section visibility
         const ipPoolSection = form.querySelector('.ip-pool-section');
         if (ipPoolSection) {
             ipPoolSection.style.display = policy.nat === 'enable' ? 'block' : 'none';
@@ -199,12 +207,14 @@ function selectPolicy(policyId) {
         renderUsersGroups(form.querySelector('.src-users-groups .user-group-items'), policy.users, policy.groups);
     } catch (error) {
         console.error('Error in selectPolicy:', error);
+        logToBackend(`Error in selectPolicy: ${error.message}`);
     }
 }
 
 function renderInterfaces(container, items, type) {
     if (!container) {
         console.error('Interface items container not found');
+        logToBackend('Interface items container not found');
         return;
     }
     container.innerHTML = '';
@@ -225,6 +235,7 @@ function renderInterfaces(container, items, type) {
 function renderAddresses(container, addrItems, addrGroupItems, isdbItems, vipItems, type) {
     if (!container) {
         console.error('Address items container not found');
+        logToBackend('Address items container not found');
         return;
     }
     container.innerHTML = '';
@@ -257,7 +268,6 @@ function renderAddresses(container, addrItems, addrGroupItems, isdbItems, vipIte
             <button onclick="deleteAddressOrInternetService('${type}', ${index})">Delete</button>
         `;
         container.appendChild(div);
-        // Initialize custom searchable select
         initSearchableSelect(div.querySelector('.address-select'), {
             placeholder: 'Select Address/ISDB'
         });
@@ -267,6 +277,7 @@ function renderAddresses(container, addrItems, addrGroupItems, isdbItems, vipIte
 function renderServices(container, items) {
     if (!container) {
         console.error('Service container not found');
+        logToBackend('Service container not found');
         return;
     }
     container.innerHTML = '';
@@ -304,6 +315,7 @@ function renderServices(container, items) {
 function renderUsersGroups(container, userItems, groupItems) {
     if (!container) {
         console.error('Users/Groups items container not found');
+        logToBackend('Users/Groups items container not found');
         return;
     }
     container.innerHTML = '';
@@ -324,7 +336,6 @@ function renderUsersGroups(container, userItems, groupItems) {
             <button onclick="deleteUserOrGroup(${index})">Delete</button>
         `;
         container.appendChild(div);
-        // Initialize custom searchable select
         initSearchableSelect(div.querySelector('.user-group-select'), {
             placeholder: 'Select User/Group'
         });
@@ -335,6 +346,7 @@ function updateDropdowns() {
     const form = document.getElementById('policy-form');
     if (!form) {
         console.error('Policy form not found for updating dropdowns');
+        logToBackend('Policy form not found for updating dropdowns');
         return;
     }
     const sslSshSelect = form.querySelector('.ssl-ssh-profile');
@@ -346,6 +358,7 @@ function updateDropdowns() {
 
     if (!sslSshSelect || !webfilterSelect || !appListSelect || !avSelect || !ipsSensorSelect || !ipPoolSelect) {
         console.error('One or more dropdown elements not found');
+        logToBackend('One or more dropdown elements not found');
         return;
     }
 
@@ -366,11 +379,13 @@ function addSrcInterface(button) {
     const policyId = button.closest('#policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for adding source interface');
+        logToBackend('Policy ID not found for adding source interface');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     policy.srcInterfaces.push('');
@@ -381,11 +396,13 @@ function addDstInterface(button) {
     const policyId = button.closest('#policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for adding destination interface');
+        logToBackend('Policy ID not found for adding destination interface');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     policy.dstInterfaces.push('');
@@ -396,11 +413,13 @@ function addSrcAddress(button) {
     const policyId = button.closest('#policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for adding source address/ISDB');
+        logToBackend('Policy ID not found for adding source address/ISDB');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     policy.srcAddresses.push('');
@@ -411,11 +430,13 @@ function addDstAddress(button) {
     const policyId = button.closest('#policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for adding destination address/ISDB');
+        logToBackend('Policy ID not found for adding destination address/ISDB');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     policy.dstAddresses.push('');
@@ -426,11 +447,13 @@ function addService(button) {
     const policyId = button.closest('#policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for adding service');
+        logToBackend('Policy ID not found for adding service');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     policy.services.push({ type: '', name: '', protocol: 'TCP', port: '' });
@@ -441,11 +464,13 @@ function addSrcUserOrGroup(button) {
     const policyId = button.closest('#policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for adding user or group');
+        logToBackend('Policy ID not found for adding user or group');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     policy.users.push('');
@@ -456,11 +481,13 @@ function updateInterface(type, index, value) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for updating interface');
+        logToBackend('Policy ID not found for updating interface');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     if (type === 'src') {
@@ -474,11 +501,13 @@ function updateAddressOrInternetService(type, index, value) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for updating address/ISDB');
+        logToBackend('Policy ID not found for updating address/ISDB');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     const [itemType, itemValue] = value.split(':');
@@ -557,11 +586,13 @@ function updateService(index, value) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for updating service');
+        logToBackend('Policy ID not found for updating service');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     const [type, name] = value.split(':');
@@ -579,11 +610,13 @@ function updateCustomService(index, field, value) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for updating custom service');
+        logToBackend('Policy ID not found for updating custom service');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     policy.services[index][field] = value;
@@ -593,11 +626,13 @@ function updateUserOrGroup(index, value) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for updating user or group');
+        logToBackend('Policy ID not found for updating user or group');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     const [type, name] = value.split(':');
@@ -624,11 +659,13 @@ function deleteInterface(type, index) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for deleting interface');
+        logToBackend('Policy ID not found for deleting interface');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     if (type === 'src') {
@@ -643,11 +680,13 @@ function deleteAddressOrInternetService(type, index) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for deleting address/ISDB');
+        logToBackend('Policy ID not found for deleting address/ISDB');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     const addrList = type === 'src' ? policy.srcAddresses : policy.dstAddresses;
@@ -671,11 +710,13 @@ function deleteService(index) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for deleting service');
+        logToBackend('Policy ID not found for deleting service');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     policy.services.splice(index, 1);
@@ -686,11 +727,13 @@ function deleteUserOrGroup(index) {
     const policyId = document.getElementById('policy-form')?.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for deleting user or group');
+        logToBackend('Policy ID not found for deleting user or group');
         return;
     }
     const policy = policies.find(p => p.id === policyId);
     if (!policy) {
         console.error(`Policy with ID ${policyId} not found`);
+        logToBackend(`Policy with ID ${policyId} not found`);
         return;
     }
     if (index < policy.users.length) {
@@ -713,32 +756,38 @@ function deletePolicy(policyId) {
 
 function savePolicy(button) {
     console.log('savePolicy triggered');
+    logToBackend('savePolicy triggered');
     try {
         const policyId = button.closest('#policy-form')?.dataset.policyId;
         if (!policyId) {
             console.error('Policy ID not found in form dataset');
+            logToBackend('Policy ID not found in form dataset');
             showNotification('Error: Policy ID not found', 'error');
             return;
         }
         console.log('Policy ID:', policyId);
+        logToBackend(`Policy ID: ${policyId}`);
 
         const policy = policies.find(p => p.id === policyId);
         if (!policy) {
             console.error(`Policy with ID ${policyId} not found`);
+            logToBackend(`Policy with ID ${policyId} not found`);
             showNotification('Error: Policy not found', 'error');
             return;
         }
         console.log('Policy found:', policy);
+        logToBackend(`Policy found: ${JSON.stringify(policy)}`);
 
         const form = button.closest('#policy-form');
         if (!form) {
             console.error('Policy form not found');
+            logToBackend('Policy form not found');
             showNotification('Error: Policy form not found', 'error');
             return;
         }
         console.log('Form found');
+        logToBackend('Form found');
 
-        // Retrieve form values
         const policyName = form.querySelector('.policy-name')?.value || '';
         const policyComment = form.querySelector('.policy-comment')?.value || '';
         const action = form.querySelector('.action')?.value || 'accept';
@@ -778,8 +827,27 @@ function savePolicy(button) {
             nat,
             ipPool
         });
+        logToBackend(`Form values: ${JSON.stringify({
+            policyName,
+            policyComment,
+            action,
+            inspectionMode,
+            sslSshProfile,
+            webfilterProfile: webfilterProfile.value,
+            webfilterEnabled,
+            applicationList: applicationList.value,
+            applicationListEnabled,
+            avProfile: avProfile.value,
+            avEnabled,
+            ipsSensor: ipsSensor.value,
+            ipsSensorEnabled,
+            logtraffic,
+            logtrafficStart,
+            autoAsicOffload,
+            nat,
+            ipPool
+        })}`);
 
-        // Update policy
         policy.name = policyName;
         policy.comment = policyComment;
         policy.action = action;
@@ -800,14 +868,16 @@ function savePolicy(button) {
         policy.ip_pool = ipPool;
 
         console.log('Policy updated:', policy);
+        logToBackend(`Policy updated: ${JSON.stringify(policy)}`);
 
-        // Refresh UI
         renderPolicyList();
         selectPolicy(policyId);
         console.log('Policy saved successfully');
+        logToBackend('Policy saved successfully');
         showNotification('Policy saved successfully', 'success');
     } catch (error) {
         console.error('Error in savePolicy:', error);
+        logToBackend(`Error in savePolicy: ${error.message}`);
         showNotification('Error saving policy: ' + error.message, 'error');
     }
 }
@@ -816,6 +886,7 @@ function clonePolicy(button) {
     const policyId = button.closest('#policy-form')?.dataset.policyId || button.dataset.policyId;
     if (!policyId) {
         console.error('Policy ID not found for cloning policy');
+        logToBackend('Policy ID not found for cloning policy');
         return;
     }
     fetch('/clone_policy', {
@@ -863,13 +934,16 @@ function clonePolicy(button) {
             renderPolicyList();
             selectPolicy(data.new_policy.policy_id);
             showNotification('Policy cloned successfully', 'success');
+            logToBackend('Policy cloned successfully');
         } else {
             console.error('Error cloning policy:', data.error);
+            logToBackend(`Error cloning policy: ${data.error}`);
             showNotification('Error cloning policy: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error cloning policy:', error);
+        logToBackend(`Error cloning policy: ${error.message}`);
         showNotification('Error cloning policy', 'error');
     });
 }
@@ -878,6 +952,7 @@ function clearForm(button) {
     const form = button ? button.closest('#policy-form') : document.getElementById('policy-form');
     if (!form) {
         console.error('Policy form not found for clearing');
+        logToBackend('Policy form not found for clearing');
         return;
     }
     form.querySelector('.policy-name').value = '';
@@ -886,7 +961,6 @@ function clearForm(button) {
     form.querySelector('.inspection-mode').value = 'flow';
     form.querySelector('.ssl-ssh-profile').value = '';
     
-    // Reset Webfilter Profile
     const webfilterCheckbox = form.querySelector('.toggle-field[data-field="webfilter-profile"]');
     const webfilterSelect = form.querySelector('.webfilter-profile');
     webfilterCheckbox.checked = true;
@@ -894,7 +968,6 @@ function clearForm(button) {
     webfilterSelect.value = '';
     webfilterCheckbox.disabled = false;
     
-    // Reset Application List
     const appListCheckbox = form.querySelector('.toggle-field[data-field="application-list"]');
     const appListSelect = form.querySelector('.application-list');
     appListCheckbox.checked = true;
@@ -902,7 +975,6 @@ function clearForm(button) {
     appListSelect.value = '';
     appListCheckbox.disabled = false;
 
-    // Reset Antivirus
     const avCheckbox = form.querySelector('.toggle-field[data-field="av-profile"]');
     const avSelect = form.querySelector('.av-profile');
     avCheckbox.checked = false;
@@ -910,7 +982,6 @@ function clearForm(button) {
     avSelect.value = '';
     avCheckbox.disabled = false;
     
-    // Reset IPS Sensor
     const ipsSensorCheckbox = form.querySelector('.toggle-field[data-field="ips-sensor"]');
     const ipsSensorSelect = form.querySelector('.ips-sensor');
     ipsSensorCheckbox.checked = true;
@@ -964,6 +1035,7 @@ function saveTemplate() {
     const templateName = document.getElementById('template-name')?.value;
     if (!templateName) {
         console.error('Template name not provided');
+        logToBackend('Template name not provided');
         showNotification('Please enter a template name', 'error');
         return;
     }
@@ -1011,22 +1083,27 @@ function saveTemplate() {
     .then(response => response.json())
     .then(data => {
         showNotification(data.message, 'success');
+        logToBackend(`Template saved: ${data.message}`);
         loadTemplateList();
     })
     .catch(error => {
         console.error('Error saving template:', error);
+        logToBackend(`Error saving template: ${error.message}`);
         showNotification('Error saving template', 'error');
     });
 }
 
 function loadTemplateList() {
     return new Promise((resolve, reject) => {
+        console.log('Loading template list, checking for preselected template:', window.preselectedTemplate);
+        logToBackend(`Loading template list, preselected template: ${window.preselectedTemplate || 'none'}`);
         fetch('/load_templates')
         .then(response => response.json())
         .then(data => {
             const select = document.getElementById('template-select');
             if (!select) {
                 console.error('Template select element not found');
+                logToBackend('Template select element not found');
                 reject('Template select element not found');
                 return;
             }
@@ -1037,10 +1114,32 @@ function loadTemplateList() {
                 option.textContent = template;
                 select.appendChild(option);
             });
+            console.log('Templates loaded:', data.templates);
+            logToBackend(`Templates loaded: ${JSON.stringify(data.templates)}`);
+            if (window.preselectedTemplate) {
+                console.log('Attempting to select preselected template:', window.preselectedTemplate);
+                logToBackend(`Attempting to select preselected template: ${window.preselectedTemplate}`);
+                if (data.templates.includes(window.preselectedTemplate)) {
+                    select.value = window.preselectedTemplate;
+                    console.log(`Preselected template ${window.preselectedTemplate} found, loading template`);
+                    logToBackend(`Preselected template ${window.preselectedTemplate} found, loading template`);
+                    loadTemplate();
+                } else {
+                    console.warn(`Preselected template "${window.preselectedTemplate}" not found in available templates:`, data.templates);
+                    logToBackend(`Preselected template "${window.preselectedTemplate}" not found in available templates: ${JSON.stringify(data.templates)}`);
+                    showNotification(`Template "${window.preselectedTemplate}" not found`, 'error');
+                    // Clear preselected template to prevent repeated attempts
+                    window.preselectedTemplate = null;
+                }
+            } else {
+                console.log('No preselected template provided');
+                logToBackend('No preselected template provided');
+            }
             resolve();
         })
         .catch(error => {
             console.error('Error loading templates:', error);
+            logToBackend(`Error loading templates: ${error.message}`);
             showNotification('Error loading templates', 'error');
             reject(error);
         });
@@ -1048,16 +1147,22 @@ function loadTemplateList() {
 }
 
 function loadTemplate() {
-    const templateName = document.getElementById('template-select')?.value;
+    const select = document.getElementById('template-select');
+    const templateName = select?.value;
     if (!templateName) {
         console.error('No template selected');
+        logToBackend('No template selected');
         showNotification('Please select a template', 'error');
         return;
     }
+    console.log(`Loading template: ${templateName}`);
+    logToBackend(`Loading template: ${templateName}`);
     fetch(`/get_template/${templateName}`)
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
+            console.log(`Template ${templateName} data received`);
+            logToBackend(`Template ${templateName} data received`);
             policies = data.data.policies.map(p => ({
                 id: p.policy_id,
                 name: p.policy_name,
@@ -1093,7 +1198,6 @@ function loadTemplate() {
                 groups: p.groups || []
             }));
 
-            // Update global config variables with template data
             interfaces = data.config.interfaces || [];
             addresses = data.config.addresses || [];
             addressGroups = data.config.address_groups || [];
@@ -1110,7 +1214,6 @@ function loadTemplate() {
             users = data.config.users || [];
             groups = data.config.groups || [];
 
-            // Merge with existing config data if available
             try {
                 fetch('/parse_config', { method: 'POST', body: new FormData() })
                     .then(res => res.json())
@@ -1135,12 +1238,12 @@ function loadTemplate() {
                         if (policies.length > 0) {
                             selectPolicy(policies[0].id);
                         }
-                        // Set the template name in the Edit Template input field
                         const templateNameInput = document.getElementById('template-name');
                         if (templateNameInput) {
                             templateNameInput.value = templateName;
                         }
                         showNotification(`Template '${templateName}' loaded successfully`, 'success');
+                        logToBackend(`Template '${templateName}' loaded successfully`);
                     })
                     .catch(() => {
                         updateDropdowns();
@@ -1148,34 +1251,37 @@ function loadTemplate() {
                         if (policies.length > 0) {
                             selectPolicy(policies[0].id);
                         }
-                        // Set the template name in the Edit Template input field even if config merge fails
                         const templateNameInput = document.getElementById('template-name');
                         if (templateNameInput) {
                             templateNameInput.value = templateName;
                         }
                         showNotification(`Template '${templateName}' loaded successfully`, 'success');
+                        logToBackend(`Template '${templateName}' loaded successfully`);
                     });
             } catch (error) {
                 console.error('Error merging config data:', error);
+                logToBackend(`Error merging config data: ${error.message}`);
                 updateDropdowns();
                 renderPolicyList();
                 if (policies.length > 0) {
                     selectPolicy(policies[0].id);
                 }
-                // Set the template name in the Edit Template input field even if an error occurs
                 const templateNameInput = document.getElementById('template-name');
                 if (templateNameInput) {
                     templateNameInput.value = templateName;
                 }
                 showNotification(`Template '${templateName}' loaded successfully`, 'success');
+                logToBackend(`Template '${templateName}' loaded successfully`);
             }
         } else {
             console.error('Error loading template:', data.error);
+            logToBackend(`Error loading template: ${data.error}`);
             showNotification('Error loading template: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error loading template:', error);
+        logToBackend(`Error loading template: ${error.message}`);
         showNotification('Error loading template', 'error');
     });
 }
@@ -1184,6 +1290,7 @@ function cloneTemplate() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
         console.error('No template selected for cloning');
+        logToBackend('No template selected for cloning');
         showNotification('Please select a template to clone', 'error');
         return;
     }
@@ -1194,14 +1301,17 @@ function cloneTemplate() {
     .then(data => {
         if (data.status === 'success') {
             showNotification(`Template cloned as ${data.new_template_name}`, 'success');
+            logToBackend(`Template cloned as ${data.new_template_name}`);
             loadTemplateList();
         } else {
             console.error('Error cloning template:', data.error);
+            logToBackend(`Error cloning template: ${data.error}`);
             showNotification('Error cloning template: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error cloning template:', error);
+        logToBackend(`Error cloning template: ${error.message}`);
         showNotification('Error cloning template', 'error');
     });
 }
@@ -1210,6 +1320,7 @@ function deleteTemplate() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
         console.error('No template selected for deletion');
+        logToBackend('No template selected for deletion');
         showNotification('Please select a template', 'error');
         return;
     }
@@ -1220,8 +1331,8 @@ function deleteTemplate() {
         .then(response => response.json())
         .then(data => {
             showNotification(data.message, 'success');
+            logToBackend(`Template deleted: ${data.message}`);
             loadTemplateList();
-            // Clear the template name input field after deletion
             const templateNameInput = document.getElementById('template-name');
             if (templateNameInput) {
                 templateNameInput.value = '';
@@ -1229,6 +1340,7 @@ function deleteTemplate() {
         })
         .catch(error => {
             console.error('Error deleting template:', error);
+            logToBackend(`Error deleting template: ${error.message}`);
             showNotification('Error deleting template', 'error');
         });
     }
@@ -1240,16 +1352,19 @@ function renameTemplate() {
 
     if (!oldName) {
         console.error('No template selected for renaming');
+        logToBackend('No template selected for renaming');
         showNotification('Please select a template to rename', 'error');
         return;
     }
     if (!newName) {
         console.error('New template name not provided');
+        logToBackend('New template name not provided');
         showNotification('Please enter a new template name', 'error');
         return;
     }
     if (oldName === newName) {
         console.warn('Old and new template names are the same');
+        logToBackend('Old and new template names are the same');
         showNotification('The new template name is the same as the current name', 'error');
         return;
     }
@@ -1263,15 +1378,18 @@ function renameTemplate() {
     .then(data => {
         if (data.status === 'success') {
             showNotification(`Template renamed to ${newName}`, 'success');
-            window.preselectedTemplate = newName; // Set preselected template to the new name
-            loadTemplateList(); // Refresh the template list and re-select the renamed template
+            logToBackend(`Template renamed to ${newName}`);
+            window.preselectedTemplate = newName;
+            loadTemplateList();
         } else {
             console.error('Error renaming template:', data.error);
+            logToBackend(`Error renaming template: ${data.error}`);
             showNotification('Error renaming template: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error renaming template:', error);
+        logToBackend(`Error renaming template: ${error.message}`);
         showNotification('Error renaming template', 'error');
     });
 }
@@ -1280,15 +1398,15 @@ function copyUrl() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
         console.error('No template selected for copying URL');
+        logToBackend('No template selected for copying URL');
         showNotification('Please select a template to copy its URL', 'error');
         return;
     }
 
-    // Construct the relative template URL
     const templateUrl = `/get_template/${templateName}`;
     console.log(`Generating URL for: ${templateUrl}`);
+    logToBackend(`Generating URL for: ${templateUrl}`);
 
-    // Call the /shorten_url endpoint
     fetch('/shorten_url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1300,20 +1418,24 @@ function copyUrl() {
             const shortCode = data.short_code;
             const shortUrl = `${window.location.origin}/s/${shortCode}`;
             console.log(`URL generated: ${shortUrl}`);
+            logToBackend(`URL generated: ${shortUrl}`);
 
-            // Copy the URL to the clipboard
             navigator.clipboard.writeText(shortUrl)
                 .then(() => {
                     console.log(`Successfully copied URL: ${shortUrl}`);
+                    logToBackend(`Successfully copied URL: ${shortUrl}`);
                     showNotification('URL copied to clipboard', 'success');
                 })
                 .catch(error => {
                     console.error('Error copying URL:', error.message);
+                    logToBackend(`Error copying URL: ${error.message}`);
                     if (error.message.includes('secure context')) {
                         console.error('Clipboard API requires a secure context (HTTPS or localhost). Ensure the page is served over HTTPS.');
+                        logToBackend('Clipboard API requires a secure context (HTTPS or localhost). Ensure the page is served over HTTPS.');
                         showNotification('Error copying URL: This feature requires a secure context (HTTPS or localhost)', 'error');
                     } else if (error.message.includes('permission')) {
                         console.error('Clipboard access denied. Check browser permissions for clipboard access.');
+                        logToBackend('Clipboard access denied. Check browser permissions for clipboard access.');
                         showNotification('Error copying URL: Clipboard access denied. Please allow clipboard permissions in your browser', 'error');
                     } else {
                         showNotification('Error copying URL: ' + error.message, 'error');
@@ -1321,11 +1443,13 @@ function copyUrl() {
                 });
         } else {
             console.error('Error generating URL:', data.error);
+            logToBackend(`Error generating URL: ${data.error}`);
             showNotification('Error generating URL: ' + data.error, 'error');
         }
     })
     .catch(error => {
         console.error('Error generating URL:', error);
+        logToBackend(`Error generating URL: ${error.message}`);
         showNotification('Error generating URL', 'error');
     });
 }
@@ -1334,6 +1458,7 @@ function importTemplate(event) {
     const fileInput = event.target;
     if (!fileInput?.files.length) {
         console.error('No template file selected');
+        logToBackend('No template file selected');
         showNotification('Please select a JSON file to import', 'error');
         return;
     }
@@ -1360,26 +1485,30 @@ function importTemplate(event) {
             .then(data => {
                 if (data.status === 'success') {
                     showNotification(`Template '${templateData.name}' imported successfully`, 'success');
+                    logToBackend(`Template '${templateData.name}' imported successfully`);
                     loadTemplateList();
-                    // Reset the file input
                     fileInput.value = '';
                 } else {
                     console.error('Error importing template:', data.error);
+                    logToBackend(`Error importing template: ${data.error}`);
                     showNotification('Error importing template: ' + data.error, 'error');
                 }
             })
             .catch(error => {
                 console.error('Error importing template:', error);
+                logToBackend(`Error importing template: ${error.message}`);
                 showNotification('Error importing template', 'error');
             });
         } catch (error) {
             console.error('Error parsing template file:', error);
+            logToBackend(`Error parsing template file: ${error.message}`);
             showNotification('Error parsing template file: ' + error.message, 'error');
         }
     };
 
     reader.onerror = function() {
         console.error('Error reading template file');
+        logToBackend('Error reading template file');
         showNotification('Error reading template file', 'error');
     };
 
@@ -1390,6 +1519,7 @@ function exportTemplate() {
     const templateName = document.getElementById('template-select')?.value;
     if (!templateName) {
         console.error('No template selected for export');
+        logToBackend('No template selected for export');
         showNotification('Please select a template to export', 'error');
         return;
     }
@@ -1413,9 +1543,11 @@ function exportTemplate() {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
         showNotification(`Template '${templateName}' exported successfully`, 'success');
+        logToBackend(`Template '${templateName}' exported successfully`);
     })
     .catch(error => {
         console.error('Error exporting template:', error);
+        logToBackend(`Error exporting template: ${error.message}`);
         showNotification('Error exporting template: ' + error.message, 'error');
     });
 }
@@ -1424,6 +1556,7 @@ function importConfig() {
     const fileInput = document.getElementById('config-file');
     if (!fileInput?.files.length) {
         console.error('No config file selected');
+        logToBackend('No config file selected');
         showNotification('Please select a file', 'error');
         return;
     }
@@ -1458,9 +1591,11 @@ function importConfig() {
             selectPolicy(policies[0].id);
         }
         showNotification('Configuration imported successfully', 'success');
+        logToBackend('Configuration imported successfully');
     })
     .catch(error => {
         console.error('Error importing config:', error);
+        logToBackend(`Error importing config: ${error.message}`);
         showNotification('Error importing config', 'error');
     });
 }
@@ -1468,6 +1603,7 @@ function importConfig() {
 function generatePolicies() {
     if (!policies.length) {
         console.error('No policies to generate');
+        logToBackend('No policies to generate');
         showNotification('No policies to generate', 'error');
         return;
     }
@@ -1517,9 +1653,11 @@ function generatePolicies() {
         document.getElementById('output2').textContent = data.outputs.map(o => o.output2).join('\n\n');
         document.getElementById('output3').textContent = data.outputs.map(o => o.output3).join('\n\n');
         showNotification('Policies generated successfully', 'success');
+        logToBackend('Policies generated successfully');
     })
     .catch(error => {
         console.error('Error generating policies:', error);
+        logToBackend(`Error generating policies: ${error.message}`);
         showNotification('Error generating policies', 'error');
     });
 }
@@ -1528,26 +1666,32 @@ function copyOutput(outputId) {
     const outputElement = document.getElementById(outputId);
     if (!outputElement) {
         console.error(`Output element ${outputId} not found`);
+        logToBackend(`Output element ${outputId} not found`);
         return;
     }
     const text = outputElement.textContent;
     if (!text) {
         console.error(`No content to copy for element ${outputId}`);
+        logToBackend(`No content to copy for element ${outputId}`);
         showNotification('No content to copy', 'error');
         return;
     }
     navigator.clipboard.writeText(text)
         .then(() => {
             console.log(`Successfully copied content for ${outputId}`);
+            logToBackend(`Successfully copied content for ${outputId}`);
             showNotification('Output copied to clipboard', 'success');
         })
         .catch(error => {
             console.error('Error copying output:', error.message);
+            logToBackend(`Error copying output: ${error.message}`);
             if (error.message.includes('secure context')) {
                 console.error('Clipboard API requires a secure context (HTTPS or localhost). Ensure the page is served over HTTPS.');
+                logToBackend('Clipboard API requires a secure context (HTTPS or localhost). Ensure the page is served over HTTPS.');
                 showNotification('Error copying output: This feature requires a secure context (HTTPS or localhost)', 'error');
             } else if (error.message.includes('permission')) {
                 console.error('Clipboard access denied. Check browser permissions for clipboard access.');
+                logToBackend('Clipboard access denied. Check browser permissions for clipboard access.');
                 showNotification('Error copying output: Clipboard access denied. Please allow clipboard permissions in your browser', 'error');
             } else {
                 showNotification('Error copying output: ' + error.message, 'error');
@@ -1564,10 +1708,10 @@ function toggleTheme() {
     const toggleButton = document.getElementById('theme-toggle');
     toggleButton.textContent = newTheme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
     toggleButton.setAttribute('aria-label', `Toggle ${newTheme === 'dark' ? 'light' : 'dark'} mode`);
+    logToBackend(`Theme toggled to: ${newTheme}`);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Apply saved theme or default to light
     const savedTheme = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
     const toggleButton = document.getElementById('theme-toggle');
@@ -1575,7 +1719,6 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleButton.setAttribute('aria-label', `Toggle ${savedTheme === 'dark' ? 'light' : 'dark'} mode`);
     toggleButton.addEventListener('click', toggleTheme);
 
-    // Add event listeners for toggle checkboxes
     const form = document.getElementById('policy-form');
     if (form) {
         const toggleCheckboxes = form.querySelectorAll('.toggle-field');
@@ -1590,28 +1733,58 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (policy) {
                     policy[`${field}_enabled`] = e.target.checked;
                     if (!e.target.checked) {
-                        policy[field] = ''; // Clear the value if disabled
+                        policy[field] = '';
                     }
                 }
+                logToBackend(`Toggle field ${field} changed to: ${e.target.checked}`);
             });
         });
     }
 
-    // Load templates and handle pre-selected template
-    loadTemplateList().then(() => {
-        if (window.preselectedTemplate) {
-            const select = document.getElementById('template-select');
-            if (select) {
-                select.value = window.preselectedTemplate;
-                loadTemplate();
+    console.log('DOM loaded, checking preselected template immediately:', window.preselectedTemplate);
+    logToBackend(`DOM loaded, initial preselected template: ${window.preselectedTemplate || 'none'}`);
+
+    // Function to initialize templates
+    const initializeTemplates = () => {
+        console.log('Initializing template list, final preselected template:', window.preselectedTemplate);
+        logToBackend(`Initializing template list, final preselected template: ${window.preselectedTemplate || 'none'}`);
+        loadTemplateList().then(() => {
+            updateDropdowns();
+            if (!window.preselectedTemplate) {
+                console.log('No preselected template, adding new policy');
+                logToBackend('No preselected template, adding new policy');
+                addPolicy();
             }
-        } else {
-            addPolicy(); // Only add a new policy if no pre-selected template
-        }
-        updateDropdowns();
-    }).catch(error => {
-        console.error('Failed to initialize templates:', error);
-        addPolicy();
-        updateDropdowns();
-    });
+        }).catch(error => {
+            console.error('Failed to initialize templates:', error);
+            logToBackend(`Failed to initialize templates: ${error.message}`);
+            addPolicy();
+            updateDropdowns();
+        });
+    };
+
+    // If preselectedTemplate is already set, initialize immediately
+    if (typeof window.preselectedTemplate !== 'undefined') {
+        initializeTemplates();
+    } else {
+        // Otherwise, wait for the window 'load' event to ensure inline scripts have run
+        window.addEventListener('load', () => {
+            console.log('Window load event, preselected template:', window.preselectedTemplate);
+            logToBackend(`Window load event, preselected template: ${window.preselectedTemplate || 'none'}`);
+            initializeTemplates();
+        });
+        // Fallback: if load event takes too long, check after a short delay
+        setTimeout(() => {
+            if (typeof window.preselectedTemplate !== 'undefined') {
+                console.log('Fallback check, preselected template set:', window.preselectedTemplate);
+                logToBackend(`Fallback check, preselected template set: ${window.preselectedTemplate}`);
+                initializeTemplates();
+            } else {
+                console.warn('Fallback check, preselected template still not set, proceeding without it');
+                logToBackend('Fallback check, preselected template still not set, proceeding without it');
+                window.preselectedTemplate = null;
+                initializeTemplates();
+            }
+        }, 1000);
+    }
 });

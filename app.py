@@ -1,4 +1,4 @@
-# app.py (Version 1.6)
+# app.py (Version 1.8)
 from flask import Flask, request, render_template, jsonify, redirect, send_file
 import json
 import re
@@ -125,21 +125,7 @@ KNOWN_SERVICES = {
     "SMTPS": {"protocol": "TCP", "port": "465"},
     "IMAP": {"protocol": "TCP", "port": "143"},
     "IMAPS": {"protocol": "TCP", "port": "993"},
-    "NTP": {"protocol": "UDP", "port": "123"},
-    "HTTPS_QUIC": {"protocol": "UDP", "port": "443"},
-    "TCP9443": {"protocol": "TCP", "port": "9443"},
-    "TCP9422": {"protocol": "TCP", "port": "9422"},
-    "UDP1194": {"protocol": "UDP", "port": "1194"},
-    "UDP1198": {"protocol": "UDP", "port": "1198"},
-    "UDP5555": {"protocol": "UDP", "port": "5555"},
-    "TCP10011_TS3_DR": {"protocol": "TCP", "port": "10011"},
-    "TCP30033_TS3_DR": {"protocol": "TCP", "port": "30033"},
-    "TCP9987_TS3_DR": {"protocol": "TCP", "port": "9987"},
-    "UDP10011_TS3_DR": {"protocol": "UDP", "port": "10011"},
-    "UDP30033_TS3_DR": {"protocol": "UDP", "port": "30033"},
-    "UDP9987_TS3_DR": {"protocol": "UDP", "port": "9987"},
-    "TCP28967_STORJ3": {"protocol": "TCP", "port": "28967"},
-    "UDP28967_STORJ3": {"protocol": "UDP", "port": "28967"}
+    "NTP": {"protocol": "UDP", "port": "123"}
 }
 
 # Load templates from SQLite
@@ -147,7 +133,26 @@ def load_templates():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT name, data FROM templates')
-    templates = [{'name': name, 'data': json.loads(data)} for name, data in cursor.fetchall()]
+    rows = cursor.fetchall()
+    templates = []
+    for name, data in rows:
+        try:
+            # Validate template name: ensure it doesn't contain invalid characters
+            if not isinstance(name, str) or not name.strip() or any(c in name for c in '"\n\r\t'):
+                logger.warning(f"Skipping template with invalid name: {name}")
+                continue
+            # Parse the JSON data
+            parsed_data = json.loads(data)
+            if not isinstance(parsed_data, dict):
+                logger.warning(f"Skipping template '{name}' due to invalid data format: {data}")
+                continue
+            templates.append({'name': name, 'data': parsed_data})
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON data for template '{name}': {str(e)}")
+            continue
+        except Exception as e:
+            logger.error(f"Unexpected error while processing template '{name}': {str(e)}")
+            continue
     conn.close()
     logger.debug("Loaded %d templates from SQLite", len(templates))
     return templates
@@ -271,30 +276,54 @@ def shorten_url():
 # Endpoint to redirect short URLs
 @app.route('/s/<short_code>')
 def redirect_short_url(short_code):
-    logger.debug(f"Received request to redirect short code: {short_code}")
-    short_urls = load_short_urls()
-    original_url = short_urls.get(short_code)
-    if not original_url:
-        logger.error(f"Short code {short_code} not found")
-        return jsonify({"error": "Short URL not found"}), 404
-    
-    if not is_trusted_domain(original_url):
-        logger.warning(f"Stored URL {original_url} for short code {short_code} does not match TRUSTED_DOMAIN {TRUSTED_DOMAIN}")
-        return jsonify({"error": f"Redirect URL does not belong to trusted domain: {TRUSTED_DOMAIN}"}), 403
+    logger.debug(f"Processing short URL redirect for code: {short_code}")
+    try:
+        short_urls = load_short_urls()
+        logger.debug(f"Loaded short URLs: {len(short_urls)} entries")
+        # Log anonymized short_urls keys for debugging (avoid logging full URLs)
+        logger.debug(f"Available short codes: {list(short_urls.keys())}")
+        original_url = short_urls.get(short_code)
+        if not original_url:
+            logger.error(f"Short code {short_code} not found in short_urls")
+            return jsonify({"error": "Short URL not found"}), 404
+        
+        # Normalize original_url to handle trailing slashes
+        original_url = original_url.rstrip('/')
+        logger.debug(f"Found original URL: {original_url} for short code: {short_code}")
+        if not is_trusted_domain(original_url):
+            logger.warning(f"Stored URL {original_url} for short code {short_code} does not match TRUSTED_DOMAIN {TRUSTED_DOMAIN}")
+            return jsonify({"error": f"Redirect URL does not belong to trusted domain: {TRUSTED_DOMAIN}"}), 403
 
-    # Extract template name from the URL (e.g., /get_template/Test2 -> Test2)
-    template_name = None
-    if original_url.startswith(f"{request.host_url}get_template/"):
-        template_name = original_url[len(f"{request.host_url}get_template/"):]
-        logger.debug(f"Extracted template name: {template_name} from URL: {original_url}")
-    
-    if not template_name:
-        logger.error(f"Could not extract template name from URL: {original_url}")
-        return jsonify({"error": "Invalid template URL in short URL"}), 400
+        # Extract template name from the URL (e.g., /get_template/Test2 -> Test2)
+        template_name = None
+        expected_prefix = f"{request.host_url.rstrip('/')}/get_template/"
+        if original_url.startswith(expected_prefix):
+            template_name = original_url[len(expected_prefix):].lstrip('/')
+            logger.debug(f"Extracted template name: {template_name} from URL: {original_url}")
+        else:
+            logger.error(f"Invalid template URL format: {original_url}. Expected prefix: {expected_prefix}")
+            return jsonify({"error": "Invalid template URL format in short URL"}), 400
 
-    # Render the main page with the template pre-selected
-    logger.debug(f"Rendering main page with pre-selected template: {template_name}")
-    return index(preselected_template=template_name)
+        if not template_name:
+            logger.error(f"Could not extract template name from URL: {original_url}")
+            return jsonify({"error": "Invalid template URL in short URL"}), 400
+
+        # Verify template exists
+        try:
+            templates = load_templates()
+            template_names = [t['name'] for t in templates]
+            if template_name not in template_names:
+                logger.warning(f"Template '{template_name}' not found in available templates: {template_names}")
+                return jsonify({"error": f"Template '{template_name}' not found"}), 404
+        except Exception as e:
+            logger.error(f"Failed to load templates for verification: {str(e)}")
+            return jsonify({"error": "Failed to verify template existence due to database error"}), 500
+
+        logger.debug(f"Rendering index page with pre-selected template: {template_name}")
+        return index(preselected_template=template_name)
+    except Exception as e:
+        logger.error(f"Unexpected error in redirect_short_url for code {short_code}: {str(e)}", exc_info=True)
+        return jsonify({"error": "Internal server error during short URL redirect"}), 500
 
 # Endpoint to receive frontend logs
 @app.route('/log', methods=['POST'])
@@ -310,7 +339,7 @@ def log_frontend():
 
 @app.route('/')
 def index(preselected_template=None):
-    logger.debug("Rendering index page")
+    logger.debug("Rendering index page with preselected_template: %s", preselected_template)
     # Initialize empty lists for profiles and config data
     ssl_ssh_profiles = []
     webfilter_profiles = []
@@ -348,27 +377,30 @@ def index(preselected_template=None):
         groups = config.get('groups', [])
         logger.debug("Loaded last config from SQLite")
     
-    return render_template(
-        'index.html',
-        service_templates=SERVICE_TEMPLATES,
-        group_templates=SERVICE_GROUP_TEMPLATES,
-        ssl_ssh_profiles=ssl_ssh_profiles,
-        webfilter_profiles=webfilter_profiles,
-        av_profiles=av_profiles,
-        application_lists=application_lists,
-        ips_sensors=ips_sensors,
-        interfaces=interfaces,
-        addresses=addresses,
-        address_groups=address_groups,
-        internet_services=internet_services,
-        vips=vips,
-        ip_pools=ip_pools,
-        services=services,
-        service_groups=service_groups,
-        users=users,
-        groups=groups,
-        preselected_template=preselected_template
-    )
+    # Explicitly create context dictionary to ensure all variables are passed
+    context = {
+        'service_templates': SERVICE_TEMPLATES,
+        'group_templates': SERVICE_GROUP_TEMPLATES,
+        'ssl_ssh_profiles': ssl_ssh_profiles,
+        'webfilter_profiles': webfilter_profiles,
+        'av_profiles': av_profiles,
+        'application_lists': application_lists,
+        'ips_sensors': ips_sensors,
+        'interfaces': interfaces,
+        'addresses': addresses,
+        'address_groups': address_groups,
+        'internet_services': internet_services,
+        'vips': vips,
+        'ip_pools': ip_pools,
+        'services': services,
+        'service_groups': service_groups,
+        'users': users,
+        'groups': groups,
+        'preselected_template': preselected_template,
+        'templates': [t['name'] for t in load_templates()]
+    }
+    logger.debug("Template context: %s", context)
+    return render_template('index.html', **context)
 
 def save_template_to_db(template_name, template_data):
     conn = sqlite3.connect(DB_PATH)
@@ -413,7 +445,7 @@ def save_template():
             'dst_vips': policy.get('dst_vips', []),
             'services': policy.get('services', []),
             'action': policy.get('action', ''),
-            'inspection_mode': policy.get('inspection_mode', 'flow'),  # Default to flow
+            'inspection_mode': policy.get('inspection_mode', 'flow'),
             'ssl_ssh_profile': policy.get('ssl_ssh_profile', ''),
             'webfilter_profile': policy.get('webfilter_profile', ''),
             'webfilter_enabled': policy.get('webfilter_enabled', True),
@@ -431,7 +463,6 @@ def save_template():
             'users': policy.get('users', []),
             'groups': policy.get('groups', [])
         }
-        # Disable profile features if action is deny
         if policy_data['action'].lower() == 'deny':
             policy_data['ssl_ssh_profile'] = ''
             policy_data['webfilter_enabled'] = False
@@ -474,7 +505,6 @@ def import_template():
             logger.error("Invalid template data format")
             return jsonify({"error": "Invalid template data format: Must contain policies"}), 400
 
-        # Validate template data structure
         required_policy_fields = [
             'policy_id', 'policy_name', 'policy_comment', 'src_interfaces', 'dst_interfaces',
             'src_addresses', 'src_address_groups', 'src_internet_services', 'src_vips',
@@ -492,16 +522,14 @@ def import_template():
                     elif field == 'av_enabled':
                         policy[field] = False
                     elif field == 'inspection_mode':
-                        policy[field] = 'flow'  # Default to flow
+                        policy[field] = 'flow'
                     elif field in ['policy_name', 'policy_comment', 'action', 'ssl_ssh_profile',
                                    'webfilter_profile', 'av_profile', 'application_list', 'ips_sensor',
                                    'logtraffic', 'logtraffic_start', 'auto_asic_offload', 'nat', 'ip_pool']:
                         policy[field] = ''
                     else:
                         policy[field] = []
-            # Ensure policy_id is unique
             policy['policy_id'] = str(uuid.uuid4())
-            # Disable profile features if action is deny
             if policy['action'].lower() == 'deny':
                 policy['ssl_ssh_profile'] = ''
                 policy['webfilter_enabled'] = False
@@ -550,8 +578,9 @@ def load_templates_endpoint():
     logger.debug("Received request to load templates")
     templates = load_templates()
     template_names = [t['name'] for t in templates]
-    logger.debug(f"Available templates: {template_names}")
-    return jsonify({"templates": template_names})
+    response = {"templates": template_names}
+    logger.debug(f"Sending response: {json.dumps(response)}")
+    return jsonify(response)
 
 @app.route('/get_template/<template_name>', methods=['GET'])
 def get_template(template_name):
@@ -559,7 +588,6 @@ def get_template(template_name):
     templates = load_templates()
     for template in templates:
         if template['name'] == template_name:
-            # Extract unique config data from template policies
             interfaces = set()
             addresses = set()
             address_groups = set()
@@ -592,7 +620,7 @@ def get_template(template_name):
                     svc_type = svc.get('type', '')
                     svc_name = svc.get('name', '')
                     if svc_type == 'group' and svc_name not in service_groups:
-                        service_groups[svc_name] = []  # Placeholder, members not stored in template
+                        service_groups[svc_name] = []
                     elif svc_type == 'template' or svc_type == 'custom':
                         svc_info = {
                             'name': svc_name,
@@ -648,7 +676,6 @@ def delete_template(template_name):
     original_length = len(templates)
     templates = [t for t in templates if t['name'] != template_name]
     
-    # Remove associated short URLs
     short_urls = load_short_urls()
     template_url = f"{request.host_url}get_template/{template_name}"
     short_urls = {k: v for k, v in short_urls.items() if v != template_url}
@@ -689,19 +716,15 @@ def rename_template():
         logger.error(f"Template '{old_name}' not found for renaming")
         return jsonify({"error": "Template not found"}), 404
 
-    # Check if the new name already exists
     for template in templates:
         if template['name'] == new_name:
             logger.error(f"Template '{new_name}' already exists")
             return jsonify({"error": "A template with the new name already exists"}), 400
 
-    # Remove the old template
     templates = [t for t in templates if t['name'] != old_name]
-    # Add the renamed template with the new name
     template_to_rename['name'] = new_name
     templates.append(template_to_rename)
 
-    # Update short URLs
     short_urls = load_short_urls()
     old_url = f"{request.host_url}get_template/{old_name}"
     new_url = f"{request.host_url}get_template/{new_name}"
@@ -769,7 +792,6 @@ def generate_policy():
             logger.warning(f"Skipping policy generation for {policy_name} due to missing required fields")
             return ""
 
-        # Enforce 32-character limit on policy_name
         if len(policy_name) > 32:
             logger.debug(f"Policy name '{policy_name}' exceeds 32 characters; truncating to 32 characters")
             policy_name = policy_name[:32]
@@ -899,7 +921,6 @@ def generate_policy():
                 svc_name = f"custom_{svc['name']}"
                 service_names.append(svc_name)
 
-        # Output 1: All-in-One Policy
         output1 = generate_single_policy(
             policy_name=policy_name,
             policy_comment=policy_comment,
@@ -932,7 +953,6 @@ def generate_policy():
         )
         logger.debug("Output 1 (All in one policy):\n%s", output1)
 
-        # Output 2: One Policy Per Service
         output2 = ""
         if service_names:
             for svc in service_names:
@@ -972,7 +992,6 @@ def generate_policy():
             output2 = "No services defined for this policy."
         logger.debug("Output 2 (One policy per service):\n%s", output2)
 
-        # Output 3: One Policy Per Src Interface, Dst Interface, and Service
         output3 = ""
         if src_interfaces and dst_interfaces and service_names:
             for src_intf in src_interfaces:
@@ -1070,7 +1089,6 @@ def parse_config():
     users = []
     groups = []
 
-    # Parse interfaces
     interface_pattern = re.compile(r'config system interface\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in interface_pattern.finditer(content):
         interface_name = match.group(1)
@@ -1097,14 +1115,12 @@ def parse_config():
                         interfaces.append(interface_name)
                         logger.debug("Found interface (fallback): %s", interface_name)
 
-    # Parse addresses
     address_pattern = re.compile(r'config firewall address\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in address_pattern.finditer(content):
         address_name = match.group(1)
         addresses.append(address_name)
         logger.debug("Found address: %s", address_name)
 
-    # Parse address groups
     addrgrp_pattern = re.compile(r'config firewall addrgrp\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in addrgrp_pattern.finditer(content):
         addrgrp_name = match.group(1)
@@ -1148,7 +1164,6 @@ def parse_config():
                 addresses.append(addr)
                 logger.debug("Found address from policy: %s", addr)
 
-    # Parse internet services
     internet_service_pattern = re.compile(r'config firewall internet-service-name\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in internet_service_pattern.finditer(content):
         isdb_name = match.group(1)
@@ -1163,12 +1178,11 @@ def parse_config():
                 internet_services.append(isdb)
                 logger.debug("Found internet service from policy: %s", isdb)
 
-    # Parse virtual IPs
     vip_pattern = re.compile(r'config firewall vip\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in vip_pattern.finditer(content):
         vip_name = match.group(1)
         vips.append(vip_name)
-        addresses.append(vip_name)  # Include VIPs in addresses for compatibility
+        addresses.append(vip_name)
         logger.debug("Found virtual IP: %s", vip_name)
 
     policy_vip_pattern = re.compile(r'set (?:srcaddr|dstaddr)\s+((?:"[^"]+"\s*)+)', re.DOTALL)
@@ -1179,7 +1193,6 @@ def parse_config():
                 vips.append(vip)
                 logger.debug("Found virtual IP from policy: %s", vip)
 
-    # Parse IPPools
     ip_pool_pattern = re.compile(r'config firewall ippool\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in ip_pool_pattern.finditer(content):
         pool_name = match.group(1)
@@ -1194,7 +1207,6 @@ def parse_config():
                 ip_pools.append(pool)
                 logger.debug("Found IP pool from policy: %s", pool)
 
-    # Parse services
     service_pattern = re.compile(
         r'config firewall service custom\s+edit\s+"([^"]+)"\s+((?:set\s+[^\n]+\n)*)\s+next',
         re.DOTALL
@@ -1230,7 +1242,6 @@ def parse_config():
                 services.append({"name": svc, "protocol": svc_info["protocol"], "port": svc_info["port"]})
                 logger.debug("Found service from policy: %s (protocol: %s, port: %s)", svc, svc_info["protocol"], svc_info["port"])
 
-    # Parse service groups
     service_group_pattern = re.compile(r'config firewall service group\s+edit\s+"([^"]+)"\s+set member\s+([^\n]+)\s+next', re.DOTALL)
     for match in service_group_pattern.finditer(content):
         group_name = match.group(1)
@@ -1238,7 +1249,6 @@ def parse_config():
         service_groups[group_name] = members
         logger.debug("Found service group: %s with members: %s", group_name, members)
 
-    # Parse users
     user_pattern = re.compile(r'config user local\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in user_pattern.finditer(content):
         user_name = match.group(1)
@@ -1246,7 +1256,6 @@ def parse_config():
             users.append(user_name)
             logger.debug("Found user: %s", user_name)
 
-    # Parse groups
     group_pattern = re.compile(r'config user group\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in group_pattern.finditer(content):
         group_name = match.group(1)
@@ -1254,7 +1263,6 @@ def parse_config():
             groups.append(group_name)
             logger.debug("Found user group: %s", group_name)
 
-    # Parse SSL/SSH profiles
     ssl_ssh_pattern = re.compile(r'config firewall ssl-ssh-profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in ssl_ssh_pattern.finditer(content):
         profile_name = match.group(1)
@@ -1263,7 +1271,6 @@ def parse_config():
             logger.debug("Found SSL/SSH profile: %s", profile_name)
     logger.debug("Total SSL/SSH profiles found via regex: %d", len(ssl_ssh_profiles))
 
-    # Parse webfilter profiles
     webfilter_pattern = re.compile(r'config webfilter profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in webfilter_pattern.finditer(content):
         profile_name = match.group(1)
@@ -1272,7 +1279,6 @@ def parse_config():
             logger.debug("Found webfilter profile: %s", profile_name)
     logger.debug("Total webfilter profiles found via regex: %d", len(webfilter_profiles))
 
-    # Parse antivirus profiles
     av_pattern = re.compile(r'config antivirus profile\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in av_pattern.finditer(content):
         profile_name = match.group(1)
@@ -1281,7 +1287,6 @@ def parse_config():
             logger.debug("Found antivirus profile: %s", profile_name)
     logger.debug("Total antivirus profiles found via regex: %d", len(av_profiles))
 
-    # Parse application lists
     application_pattern = re.compile(r'config application list\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in application_pattern.finditer(content):
         list_name = match.group(1)
@@ -1290,7 +1295,6 @@ def parse_config():
             logger.debug("Found application list: %s", list_name)
     logger.debug("Total application lists found via regex: %d", len(application_lists))
 
-    # Parse IPS sensors
     ips_pattern = re.compile(r'config ips sensor\s+edit\s+"([^"]+)"\s*(?:.*?\n)*(?=\s*(?:edit\s+"[^"]+"|end))', re.DOTALL)
     for match in ips_pattern.finditer(content):
         sensor_name = match.group(1)
@@ -1299,7 +1303,6 @@ def parse_config():
             logger.debug("Found IPS sensor: %s", sensor_name)
     logger.debug("Total IPS sensors found via regex: %d", len(ips_sensors))
 
-    # Fallback line-by-line parsing for interfaces, addresses, address groups, internet services, VIPs, services, users, groups, and profiles
     lines = content.splitlines()
     inside_interface_section = False
     inside_address_section = False
@@ -1320,7 +1323,6 @@ def parse_config():
     for i, line in enumerate(lines):
         line = line.strip()
         logger.debug("Processing line %d: %s", i, line)
-        # Section entry points
         if line.startswith('config system interface'):
             inside_interface_section = True
             logger.debug("Entered config system interface section")
@@ -1383,12 +1385,10 @@ def parse_config():
             inside_ips_section = True
             logger.debug("Entered config ips sensor section")
             continue
-        # Handle nested config sections
         if line.startswith('config '):
             nested_level += 1
             logger.debug("Entered nested config section, level: %d", nested_level)
             continue
-        # Handle section exits
         if line.startswith('end'):
             if nested_level > 0:
                 nested_level -= 1
@@ -1439,7 +1439,6 @@ def parse_config():
                 inside_ips_section = False
                 logger.debug("Exited config ips sensor section")
             continue
-        # Process edit lines within relevant sections
         if line.startswith('edit ') and (
             inside_interface_section or
             inside_address_section or
@@ -1539,7 +1538,6 @@ def parse_config():
         "groups": groups
     }
     
-    # Save parsed config to SQLite
     save_last_config(response)
     
     logger.debug("Returning parsed config response: %s", response)
